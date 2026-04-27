@@ -303,12 +303,9 @@ public class ReplayInventoryUI implements Listener {
 
     @EventHandler
     public void onInventoryDrag(InventoryDragEvent e) {
-        if (e.getWhoClicked() != viewer)
-            return;
         if (!sessionControl.isActive())
             return;
-        Component dragTitle = e.getView().title();
-        if (!(dragTitle instanceof TextComponent dtc) || !dtc.content().contains("'s Inventory"))
+        if (!e.getWhoClicked().equals(viewer))
             return;
 
         e.setCancelled(true);
@@ -316,22 +313,11 @@ public class ReplayInventoryUI implements Listener {
 
     @EventHandler(priority = EventPriority.HIGH)
     public void onPlayerDropItem(PlayerDropItemEvent e) {
-        Player player = e.getPlayer();
-
         if (!sessionControl.isActive())
             return;
-
-        if (!player.equals(viewer))
+        if (!e.getPlayer().equals(viewer))
             return;
 
-        ItemStack item = e.getItemDrop().getItemStack();
-        if (item == null || !item.hasItemMeta())
-            return;
-
-        Component dropDisplayName = item.getItemMeta().displayName();
-        String dropName = dropDisplayName instanceof TextComponent tc ? tc.content() : "";
-        if (dropName.equals("Pause / Play") || dropName.equals("+5 seconds") || dropName.equals("-5 seconds")) {
-            e.setCancelled(true);
-        }
+        e.setCancelled(true);
     }
 }

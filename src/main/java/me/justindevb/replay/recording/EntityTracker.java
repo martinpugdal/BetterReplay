@@ -22,6 +22,7 @@ public class EntityTracker {
     public EntityTracker(Collection<Player> players) {
         this.trackedPlayers = new HashSet<>();
         for (Player p : players) {
+            if (p == null) continue;
             this.trackedPlayers.add(p.getUniqueId());
         }
     }

@@ -25,8 +25,8 @@ public class RecorderManager {
         RecordingSession session = new RecordingSession(name, replay.getDataFolder(), players, durationSeconds);
         session.start();
 
-        Bukkit.getPluginManager().callEvent(new RecordingStartEvent(name, players, session, durationSeconds));
         activeSessions.put(name, session);
+        Bukkit.getPluginManager().callEvent(new RecordingStartEvent(name, players, session, durationSeconds));
 
         if (tickTask == null) {
             tickTask = replay.getFoliaLib().getScheduler().runTimer(this::tickAll, 1L, 1L);
@@ -37,8 +37,9 @@ public class RecorderManager {
 
     public boolean stopSession(String name, boolean save) {
         RecordingSession session = activeSessions.remove(name);
-        if (session == null)
+        if (session == null) {
             return false;
+        }
 
         session.stop(save);
 
