@@ -17,6 +17,7 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.Location;
 
 import java.util.UUID;
+import java.util.function.Consumer;
 
 import static me.justindevb.replay.util.io.ItemStackSerializer.serializeItem;
 
@@ -30,6 +31,7 @@ public class RecordingEventHandler implements Listener {
     private final EntityTracker tracker;
     private final TimelineBuilder builder;
     private final TickProvider tickProvider;
+    private final Consumer<UUID> onPlayerRemoved;
 
     @FunctionalInterface
     public interface TickProvider {
@@ -37,9 +39,14 @@ public class RecordingEventHandler implements Listener {
     }
 
     public RecordingEventHandler(EntityTracker tracker, TimelineBuilder builder, TickProvider tickProvider) {
+        this(tracker, builder, tickProvider, uuid -> {});
+    }
+
+    public RecordingEventHandler(EntityTracker tracker, TimelineBuilder builder, TickProvider tickProvider, Consumer<UUID> onPlayerRemoved) {
         this.tracker = tracker;
         this.builder = builder;
         this.tickProvider = tickProvider;
+        this.onPlayerRemoved = onPlayerRemoved;
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
@@ -273,6 +280,7 @@ public class RecordingEventHandler implements Listener {
                     p.getUniqueId().toString()
             ));
             tracker.removePlayer(p.getUniqueId());
+            onPlayerRemoved.accept(p.getUniqueId());
         }
     }
 }

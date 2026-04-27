@@ -20,7 +20,9 @@ public class RecordingPacketHandler implements PacketListener {
     private final EntityTracker tracker;
     private final TimelineBuilder builder;
     private final RecordingEventHandler.TickProvider tickProvider;
-    private final Map<String, Integer> breakStageDedup = new HashMap<>();
+    private final Map<DedupKey, Integer> breakStageDedup = new HashMap<>();
+
+    private record DedupKey(String world, int x, int y, int z, int stage) {}
 
     public RecordingPacketHandler(EntityTracker tracker, TimelineBuilder builder, RecordingEventHandler.TickProvider tickProvider) {
         this.tracker = tracker;
@@ -43,7 +45,7 @@ public class RecordingPacketHandler implements PacketListener {
 
             int tick = tickProvider.getTick();
 
-            String dedupKey = world + ":" + x + ":" + y + ":" + z + ":" + stage;
+            DedupKey dedupKey = new DedupKey(world, x, y, z, stage);
             Integer lastTick = breakStageDedup.get(dedupKey);
             if (lastTick != null && lastTick == tick) {
                 return;

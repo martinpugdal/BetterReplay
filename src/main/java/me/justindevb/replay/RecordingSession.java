@@ -52,7 +52,7 @@ public class RecordingSession {
 
         this.tracker = new EntityTracker(players);
         this.builder = new TimelineBuilder();
-        this.eventHandler = new RecordingEventHandler(tracker, builder, this::getTick);
+        this.eventHandler = new RecordingEventHandler(tracker, builder, this::getTick, lastInventorySnapshot::remove);
         this.packetHandler = new RecordingPacketHandler(tracker, builder, this::getTick);
     }
 
@@ -99,13 +99,15 @@ public class RecordingSession {
             Entity e = Bukkit.getEntity(uuid);
             if (e == null || e.isDead()) continue;
 
+            Location entityLoc = e.getLocation();
+
             builder.addEvent(new TimelineEvent.EntityMove(
                     tick,
                     uuid.toString(),
                     e.getType().name(),
-                    e.getWorld().getName(),
-                    e.getLocation().getX(), e.getLocation().getY(), e.getLocation().getZ(),
-                    e.getLocation().getYaw(), e.getLocation().getPitch()
+                    entityLoc.getWorld().getName(),
+                    entityLoc.getX(), entityLoc.getY(), entityLoc.getZ(),
+                    entityLoc.getYaw(), entityLoc.getPitch()
             ));
         }
 
@@ -121,13 +123,15 @@ public class RecordingSession {
             Player p = Bukkit.getPlayer(uuid);
             if (p == null || !p.isOnline()) continue;
 
-            List<String> currentSerialized = new ArrayList<>();
+            ItemStack[] inventoryContents = p.getInventory().getContents();
+            ItemStack[] armorContents = p.getInventory().getArmorContents();
+            List<String> currentSerialized = new ArrayList<>(2 + inventoryContents.length + armorContents.length);
             currentSerialized.add(String.valueOf(p.getInventory().getHeldItemSlot()));
-            for (ItemStack item : p.getInventory().getContents()) {
+            for (ItemStack item : inventoryContents) {
                 currentSerialized.add(serializeItem(item));
             }
             currentSerialized.add(serializeItem(p.getInventory().getItemInOffHand()));
-            for (ItemStack armor : p.getInventory().getArmorContents()) {
+            for (ItemStack armor : armorContents) {
                 currentSerialized.add(serializeItem(armor));
             }
 

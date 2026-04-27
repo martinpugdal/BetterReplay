@@ -31,6 +31,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
+import java.util.HashSet;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -439,6 +441,54 @@ class RecordingEventHandlerTest {
         handler.onQuit(event);
 
         assertTrue(builder.getTimeline().isEmpty());
+    }
+
+    @Test
+    void onQuit_trackedPlayer_invokesPlayerRemovedCallback() {
+        Set<UUID> removed = new HashSet<>();
+        RecordingEventHandler handlerWithCallback = new RecordingEventHandler(
+                tracker, builder, () -> tick, removed::add);
+
+        UUID uuid = UUID.randomUUID();
+        Player p = mockPlayer(uuid);
+        when(tracker.isTrackedPlayer(uuid)).thenReturn(true);
+
+        PlayerQuitEvent event = new PlayerQuitEvent(p, (net.kyori.adventure.text.Component) null, PlayerQuitEvent.QuitReason.DISCONNECTED);
+        handlerWithCallback.onQuit(event);
+
+        assertEquals(Set.of(uuid), removed);
+        verify(tracker).removePlayer(uuid);
+    }
+
+    @Test
+    void onQuit_untrackedPlayer_doesNotInvokeCallback() {
+        Set<UUID> removed = new HashSet<>();
+        RecordingEventHandler handlerWithCallback = new RecordingEventHandler(
+                tracker, builder, () -> tick, removed::add);
+
+        UUID uuid = UUID.randomUUID();
+        Player p = mockPlayer(uuid);
+        when(tracker.isTrackedPlayer(uuid)).thenReturn(false);
+
+        PlayerQuitEvent event = new PlayerQuitEvent(p, (net.kyori.adventure.text.Component) null, PlayerQuitEvent.QuitReason.DISCONNECTED);
+        handlerWithCallback.onQuit(event);
+
+        assertTrue(removed.isEmpty());
+        verify(tracker, never()).removePlayer(uuid);
+    }
+
+    @Test
+    void onQuit_legacyThreeArgConstructor_doesNotThrow() {
+        RecordingEventHandler legacy = new RecordingEventHandler(tracker, builder, () -> tick);
+
+        UUID uuid = UUID.randomUUID();
+        Player p = mockPlayer(uuid);
+        when(tracker.isTrackedPlayer(uuid)).thenReturn(true);
+
+        PlayerQuitEvent event = new PlayerQuitEvent(p, (net.kyori.adventure.text.Component) null, PlayerQuitEvent.QuitReason.DISCONNECTED);
+        assertDoesNotThrow(() -> legacy.onQuit(event));
+        assertEquals(1, builder.getTimeline().size());
+        assertInstanceOf(TimelineEvent.PlayerQuit.class, builder.getTimeline().get(0));
     }
 
     // ── EntitySpawn ───────────────────────────────────────────

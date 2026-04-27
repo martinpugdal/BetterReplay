@@ -32,8 +32,9 @@ public class TimelineBuilder {
         armor.add(serializeItem(p.getInventory().getChestplate()));
         armor.add(serializeItem(p.getInventory().getHelmet()));
 
-        List<String> contents = new ArrayList<>();
-        for (ItemStack item : p.getInventory().getContents()) {
+        ItemStack[] inventoryContents = p.getInventory().getContents();
+        List<String> contents = new ArrayList<>(inventoryContents.length);
+        for (ItemStack item : inventoryContents) {
             contents.add(serializeItem(item));
         }
 

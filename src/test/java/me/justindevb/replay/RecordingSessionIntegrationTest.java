@@ -3,12 +3,15 @@ package me.justindevb.replay;
 import com.github.retrooper.packetevents.PacketEvents;
 import com.github.retrooper.packetevents.PacketEventsAPI;
 import com.github.retrooper.packetevents.event.EventManager;
+import me.justindevb.replay.recording.EntityTracker;
 import me.justindevb.replay.recording.TimelineEvent;
 import me.justindevb.replay.storage.ReplayStorage;
 import me.justindevb.replay.util.ReplayCache;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;
+import org.bukkit.entity.Entity;
+import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Pose;
 import org.bukkit.inventory.ItemStack;
@@ -24,6 +27,7 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
 import java.io.File;
+import java.lang.reflect.Field;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -271,6 +275,65 @@ class RecordingSessionIntegrationTest {
 
             assertTrue(s.isStopped());
             assertTrue(s.getTick() <= 20);
+        }
+    }
+
+    @Test
+    void tick_trackedEntity_callsGetLocationOncePerTick() throws Exception {
+        try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class);
+             MockedStatic<Replay> replayStatic = mockStatic(Replay.class)) {
+
+            replayStatic.when(Replay::getInstance).thenReturn(plugin);
+
+            // Player path: present so the loop runs but is irrelevant to the assertion
+            bukkit.when(() -> Bukkit.getPlayer(playerUuid)).thenReturn(player);
+            when(player.isOnline()).thenReturn(true);
+            when(player.getLocation()).thenReturn(new Location(world, 0, 64, 0, 0, 0));
+            when(player.getPose()).thenReturn(Pose.STANDING);
+            when(player.getName()).thenReturn("TestPlayer");
+            when(world.getName()).thenReturn("world");
+            when(player.getWorld()).thenReturn(world);
+            when(player.getInventory()).thenReturn(playerInventory);
+            when(playerInventory.getContents()).thenReturn(new ItemStack[36]);
+            when(playerInventory.getArmorContents()).thenReturn(new ItemStack[4]);
+            when(playerInventory.getItemInOffHand()).thenReturn(null);
+            when(playerInventory.getHeldItemSlot()).thenReturn(0);
+
+            // Tracked entity setup
+            UUID entityUuid = UUID.randomUUID();
+            Entity entity = mock(Entity.class);
+            Location entityLoc = new Location(world, 5, 65, 5, 90f, -45f);
+            when(entity.getLocation()).thenReturn(entityLoc);
+            when(entity.getType()).thenReturn(EntityType.ZOMBIE);
+            when(entity.isDead()).thenReturn(false);
+            bukkit.when(() -> Bukkit.getEntity(entityUuid)).thenReturn(entity);
+
+            RecordingSession s = createSession(-1);
+
+            // RecordingSession owns its tracker; reach in via reflection to inject a tracked entity
+            Field trackerField = RecordingSession.class.getDeclaredField("tracker");
+            trackerField.setAccessible(true);
+            EntityTracker tracker = (EntityTracker) trackerField.get(s);
+            tracker.trackEntity(entityUuid, EntityType.ZOMBIE);
+
+            s.tick();
+
+            // The tick() optimization caches the Location object from a single getLocation()
+            // call rather than the prior pattern of 4 separate calls per entity per tick.
+            verify(entity, times(1)).getLocation();
+
+            // Sanity: an EntityMove event with the right fields was actually produced
+            TimelineEvent.EntityMove move = (TimelineEvent.EntityMove) s.getTimeline().stream()
+                    .filter(e -> e instanceof TimelineEvent.EntityMove)
+                    .findFirst().orElseThrow();
+            assertEquals(entityUuid.toString(), move.uuid());
+            assertEquals("ZOMBIE", move.etype());
+            assertEquals("world", move.world());
+            assertEquals(5.0, move.x());
+            assertEquals(65.0, move.y());
+            assertEquals(5.0, move.z());
+            assertEquals(90f, move.yaw());
+            assertEquals(-45f, move.pitch());
         }
     }
 

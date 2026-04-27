@@ -69,7 +69,7 @@ public class EntityTracker {
 
         World spawnWorld = spawnLoc.getWorld();
 
-        for (UUID uuid : Set.copyOf(trackedPlayers)) {
+        for (UUID uuid : trackedPlayers) {
             Player tracked = Bukkit.getPlayer(uuid);
             if (tracked == null) continue;
 
