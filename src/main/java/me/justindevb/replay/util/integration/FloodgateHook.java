@@ -1,11 +1,10 @@
-package me.justindevb.replay.util;
+package me.justindevb.replay.util.integration;
 
+import java.util.UUID;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.Plugin;
 import org.geysermc.floodgate.api.FloodgateApi;
 import org.geysermc.floodgate.api.player.FloodgatePlayer;
-
-import java.util.UUID;
 
 public class FloodgateHook {
 
@@ -13,8 +12,6 @@ public class FloodgateHook {
         Plugin plugin = Bukkit.getPluginManager().getPlugin("Floodgate");
         if (plugin == null || !plugin.isEnabled())
             return uuid;
-
-
 
         FloodgateApi api = FloodgateApi.getInstance();
 
@@ -26,3 +23,4 @@ public class FloodgateHook {
         return uuid;
     }
 }
+

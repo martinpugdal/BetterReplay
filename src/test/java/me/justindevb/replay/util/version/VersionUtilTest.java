@@ -1,17 +1,16 @@
-package me.justindevb.replay.util;
+package me.justindevb.replay.util.version;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.google.gson.reflect.TypeToken;
+import java.lang.reflect.Type;
+import java.util.List;
 import me.justindevb.replay.recording.TimelineEvent;
 import me.justindevb.replay.recording.TimelineEventAdapter;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-
-import java.lang.reflect.Type;
-import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 

@@ -1,8 +1,7 @@
-package me.justindevb.replay.util;
+package me.justindevb.replay.util.entity;
 
 import com.github.retrooper.packetevents.protocol.entity.type.EntityType;
 import com.github.retrooper.packetevents.protocol.entity.type.EntityTypes;
-
 import java.util.EnumMap;
 import java.util.Map;
 
@@ -13,7 +12,7 @@ public class EntityTypeMapper {
     static {
         for (org.bukkit.entity.EntityType bukkitType : org.bukkit.entity.EntityType.values()) {
             EntityType peType = EntityTypes.getByName(bukkitType.name().toLowerCase());
-            if (peType != null) ENTITY_TYPE_MAP.put(bukkitType, peType);
+            ENTITY_TYPE_MAP.put(bukkitType, peType);
         }
     }
 
@@ -21,3 +20,4 @@ public class EntityTypeMapper {
         return ENTITY_TYPE_MAP.get(type);
     }
 }
+

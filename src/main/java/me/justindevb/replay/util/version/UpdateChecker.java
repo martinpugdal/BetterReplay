@@ -1,13 +1,12 @@
-package me.justindevb.replay.util;
-
-import me.justindevb.replay.Replay;
-import org.bukkit.plugin.java.JavaPlugin;
+package me.justindevb.replay.util.version;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.util.Scanner;
 import java.util.function.Consumer;
+import me.justindevb.replay.Replay;
+import org.bukkit.plugin.java.JavaPlugin;
 
 public class UpdateChecker {
 

@@ -1,4 +1,4 @@
-package me.justindevb.replay.util;
+package me.justindevb.replay.util.cache;
 
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -16,5 +16,6 @@ public class ReplayCache {
         replays.addAll(names);
     }
 }
+
 
 

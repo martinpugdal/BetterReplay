@@ -1,4 +1,4 @@
-package me.justindevb.replay.util;
+package me.justindevb.replay.util.model;
 
 
 import me.justindevb.replay.recording.TimelineEvent;
