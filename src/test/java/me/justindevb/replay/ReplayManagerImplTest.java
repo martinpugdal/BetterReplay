@@ -1,18 +1,17 @@
 package me.justindevb.replay;
 
+import java.util.Collection;
+import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 import me.justindevb.replay.storage.ReplayStorage;
-import me.justindevb.replay.util.ReplayCache;
+import me.justindevb.replay.util.cache.ReplayCache;
 import org.bukkit.entity.Player;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-
-import java.util.Collection;
-import java.util.List;
-import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -26,12 +25,14 @@ class ReplayManagerImplTest {
     @Mock private ReplayCache replayCache;
 
     private ReplayManagerImpl manager;
+    private ReplayRegistry replayRegistry;
 
     @BeforeEach
     void setUp() {
         lenient().when(plugin.getReplayStorage()).thenReturn(storage);
         lenient().when(plugin.getReplayCache()).thenReturn(replayCache);
-        manager = new ReplayManagerImpl(plugin, recorderManager);
+        replayRegistry = new ReplayRegistry();
+        manager = new ReplayManagerImpl(plugin, recorderManager, replayRegistry);
     }
 
     @Test
@@ -92,7 +93,7 @@ class ReplayManagerImplTest {
     @Test
     void listSavedReplays_nullStorage_returnsEmptyList() {
         when(plugin.getReplayStorage()).thenReturn(null);
-        manager = new ReplayManagerImpl(plugin, recorderManager);
+        manager = new ReplayManagerImpl(plugin, recorderManager, replayRegistry);
 
         List<String> result = manager.listSavedReplays().join();
         assertTrue(result.isEmpty());
@@ -113,7 +114,7 @@ class ReplayManagerImplTest {
     @Test
     void deleteSavedReplay_nullStorage_returnsFalse() {
         when(plugin.getReplayStorage()).thenReturn(null);
-        manager = new ReplayManagerImpl(plugin, recorderManager);
+        manager = new ReplayManagerImpl(plugin, recorderManager, replayRegistry);
 
         boolean result = manager.deleteSavedReplay("test").join();
         assertFalse(result);

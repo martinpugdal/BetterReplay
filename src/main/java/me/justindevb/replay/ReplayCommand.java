@@ -1,5 +1,10 @@
 package me.justindevb.replay;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.logging.Level;
 import me.justindevb.replay.api.ReplayManager;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.event.ClickEvent;
@@ -10,12 +15,6 @@ import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
-
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import java.util.logging.Level;
 
 public class ReplayCommand implements CommandExecutor, TabCompleter {
     private final ReplayManager replayManager;
@@ -52,7 +51,8 @@ public class ReplayCommand implements CommandExecutor, TabCompleter {
 
                 try {
                     duration = Integer.parseInt(args[args.length - 1]);
-                } catch (NumberFormatException ignored) {}
+                } catch (NumberFormatException ignored) {
+                }
 
                 int endIndex = (duration != -1 ? args.length - 1 : args.length);
 
@@ -76,7 +76,7 @@ public class ReplayCommand implements CommandExecutor, TabCompleter {
 
                 if (replayManager.startRecording(sessionName, targets, duration)) {
                     p.sendMessage("§aStarted recording session: " + sessionName + " (" +
-                            (duration == -1 ? "∞" : duration + "s") + ")");
+                        (duration == -1 ? "∞" : duration + "s") + ")");
                 } else {
                     p.sendMessage("§cSession with that name already exists!");
                 }
@@ -131,58 +131,58 @@ public class ReplayCommand implements CommandExecutor, TabCompleter {
                 final int page = parsedPage;
 
                 replayManager.listSavedReplays()
-                        .thenAccept(replays -> Bukkit.getScheduler().runTask(Replay.getInstance(), () -> {
-                            if (replays.isEmpty()) {
-                                p.sendMessage("§cNo replays found.");
-                                return;
-                            }
+                    .thenAccept(replays -> Bukkit.getScheduler().runTask(Replay.getInstance(), () -> {
+                        if (replays.isEmpty()) {
+                            p.sendMessage("§cNo replays found.");
+                            return;
+                        }
 
-                            int perPage = Replay.getInstance().getConfig().getInt("list-page-size", 10);
-                            int totalPages = (int) Math.ceil((double) replays.size() / perPage);
+                        int perPage = Replay.getInstance().getConfig().getInt("list-page-size", 10);
+                        int totalPages = (int) Math.ceil((double) replays.size() / perPage);
 
-                            if (page > totalPages) {
-                                p.sendMessage("§cPage out of range. Max page: " + totalPages);
-                                return;
-                            }
+                        if (page > totalPages) {
+                            p.sendMessage("§cPage out of range. Max page: " + totalPages);
+                            return;
+                        }
 
-                            int from = (page - 1) * perPage;
-                            int to = Math.min(from + perPage, replays.size());
+                        int from = (page - 1) * perPage;
+                        int to = Math.min(from + perPage, replays.size());
 
-                            p.sendMessage("§6Replays §7(Page " + page + "/" + totalPages + ")");
-                            for (int i = from; i < to; i++) {
-                                p.sendMessage("§e- §f" + replays.get(i));
-                            }
+                        p.sendMessage("§6Replays §7(Page " + page + "/" + totalPages + ")");
+                        for (int i = from; i < to; i++) {
+                            p.sendMessage("§e- §f" + replays.get(i));
+                        }
 
-                            Component navigation = Component.empty();
+                        Component navigation = Component.empty();
 
-                            if (page > 1) {
-                                navigation = navigation.append(
-                                        Component.text("§e[Previous]")
-                                                .clickEvent(ClickEvent.runCommand("/replay list " + (page - 1)))
-                                                .hoverEvent(HoverEvent.showText(Component.text("Go to page " + (page - 1))))
-                                );
-                            } else {
-                                navigation = navigation.append(Component.text("§7[Previous]"));
-                            }
+                        if (page > 1) {
+                            navigation = navigation.append(
+                                Component.text("§e[Previous]")
+                                    .clickEvent(ClickEvent.runCommand("/replay list " + (page - 1)))
+                                    .hoverEvent(HoverEvent.showText(Component.text("Go to page " + (page - 1))))
+                            );
+                        } else {
+                            navigation = navigation.append(Component.text("§7[Previous]"));
+                        }
 
-                            navigation = navigation.append(Component.text(" §8| "));
+                        navigation = navigation.append(Component.text(" §8| "));
 
-                            if (page < totalPages) {
-                                navigation = navigation.append(
-                                        Component.text("§e[Next]")
-                                                .clickEvent(ClickEvent.runCommand("/replay list " + (page + 1)))
-                                                .hoverEvent(HoverEvent.showText(Component.text("Go to page " + (page + 1))))
-                                );
-                            } else {
-                                navigation = navigation.append(Component.text("§7[Next]"));
-                            }
+                        if (page < totalPages) {
+                            navigation = navigation.append(
+                                Component.text("§e[Next]")
+                                    .clickEvent(ClickEvent.runCommand("/replay list " + (page + 1)))
+                                    .hoverEvent(HoverEvent.showText(Component.text("Go to page " + (page + 1))))
+                            );
+                        } else {
+                            navigation = navigation.append(Component.text("§7[Next]"));
+                        }
 
-                            p.sendMessage(navigation);
-                        }))
-                        .exceptionally(ex -> {
-                            Replay.getInstance().getLogger().log(Level.SEVERE, "Failed to print list", ex);
-                            return null;
-                        });
+                        p.sendMessage(navigation);
+                    }))
+                    .exceptionally(ex -> {
+                        Replay.getInstance().getLogger().log(Level.SEVERE, "Failed to print list", ex);
+                        return null;
+                    });
 
                 return true;
             }
@@ -198,22 +198,22 @@ public class ReplayCommand implements CommandExecutor, TabCompleter {
                 }
                 String name = joinArgs(args, 1);
                 replayManager.deleteSavedReplay(name)
-                        .thenAccept(success -> {
-                            Replay.getInstance().getFoliaLib().getScheduler().runNextTick(task -> {
-                                if (success) {
-                                    p.sendMessage("§aDeleted replay: " + name);
-                                } else {
-                                    p.sendMessage("§cReplay not found: " + name);
-                                }
-                            });
-                        })
-                        .exceptionally(ex -> {
-                            Replay.getInstance().getLogger().log(Level.SEVERE, "Failed to delete replay: " + name, ex);
-                            Replay.getInstance().getFoliaLib().getScheduler().runNextTick(task ->
-                                    p.sendMessage("§cFailed to delete replay: " + name));
-                            return null;
+                    .thenAccept(success -> {
+                        Replay.getInstance().getFoliaLib().getScheduler().runNextTick(task -> {
+                            if (success) {
+                                p.sendMessage("§aDeleted replay: " + name);
+                            } else {
+                                p.sendMessage("§cReplay not found: " + name);
+                            }
                         });
-                        return true;
+                    })
+                    .exceptionally(ex -> {
+                        Replay.getInstance().getLogger().log(Level.SEVERE, "Failed to delete replay: " + name, ex);
+                        Replay.getInstance().getFoliaLib().getScheduler().runNextTick(task ->
+                            p.sendMessage("§cFailed to delete replay: " + name));
+                        return null;
+                    });
+                return true;
             }
             default -> {
                 p.sendMessage("§cUnknown subcommand: §f" + args[0]);
@@ -255,8 +255,8 @@ public class ReplayCommand implements CommandExecutor, TabCompleter {
             if (sender.hasPermission("replay.list")) completions.add("list");
 
             return completions.stream()
-                    .filter(s -> s.startsWith(args[0].toLowerCase()))
-                    .toList();
+                .filter(s -> s.startsWith(args[0].toLowerCase()))
+                .toList();
         }
 
         if (args.length >= 2 && (args[0].equalsIgnoreCase("delete") || args[0].equalsIgnoreCase("play"))) {
@@ -268,8 +268,8 @@ public class ReplayCommand implements CommandExecutor, TabCompleter {
             String prefix = joinArgs(args, 1).toLowerCase();
 
             List<String> matches = cachedReplays.stream()
-                    .filter(name -> name.toLowerCase().startsWith(prefix))
-                    .toList();
+                .filter(name -> name.toLowerCase().startsWith(prefix))
+                .toList();
             if (matches.isEmpty() && args.length == 2) {
                 return List.of("<name>");
             }
@@ -283,9 +283,9 @@ public class ReplayCommand implements CommandExecutor, TabCompleter {
             String prefix = joinArgs(args, 1).toLowerCase();
 
             List<String> matches = replayManager.getActiveRecordings()
-                    .stream()
-                    .filter(name -> name.toLowerCase().startsWith(prefix))
-                    .toList();
+                .stream()
+                .filter(name -> name.toLowerCase().startsWith(prefix))
+                .toList();
             if (matches.isEmpty() && args.length == 2) {
                 return List.of("<name>");
             }
@@ -307,9 +307,9 @@ public class ReplayCommand implements CommandExecutor, TabCompleter {
             String currentArg = args[2].toLowerCase();
 
             return Bukkit.getOnlinePlayers().stream()
-                    .map(Player::getName)
-                    .filter(name -> name.toLowerCase().startsWith(currentArg))
-                    .toList();
+                .map(Player::getName)
+                .filter(name -> name.toLowerCase().startsWith(currentArg))
+                .toList();
         }
 
         if (args.length >= 4 && args[0].equalsIgnoreCase("start")) {
@@ -325,10 +325,10 @@ public class ReplayCommand implements CommandExecutor, TabCompleter {
             String currentArg = args[args.length - 1].toLowerCase();
 
             List<String> suggestions = Bukkit.getOnlinePlayers().stream()
-                    .map(Player::getName)
-                    .filter(name -> !alreadySelected.contains(name.toLowerCase()))
-                    .filter(name -> name.toLowerCase().startsWith(currentArg))
-                    .collect(java.util.stream.Collectors.toCollection(ArrayList::new));
+                .map(Player::getName)
+                .filter(name -> !alreadySelected.contains(name.toLowerCase()))
+                .filter(name -> name.toLowerCase().startsWith(currentArg))
+                .collect(java.util.stream.Collectors.toCollection(ArrayList::new));
 
             // Show duration hint now that at least one player is selected
             if (currentArg.isEmpty() || "[seconds]".startsWith(currentArg)) {

@@ -1,12 +1,14 @@
 package me.justindevb.replay;
 
 import com.tcoded.folialib.wrapper.task.WrappedTask;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map;
 import me.justindevb.replay.api.events.RecordingStartEvent;
 import me.justindevb.replay.api.events.RecordingStopEvent;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
-
-import java.util.*;
 
 public class RecorderManager {
     private final Replay replay;
@@ -74,23 +76,6 @@ public class RecorderManager {
     public Map<String, RecordingSession> getActiveSessions() {
         return activeSessions;
     }
-
-    @Deprecated
-    public void replaySession(String name, Player viewer) {
-        replay.getReplayStorage().loadReplay(name)
-                .thenAccept(timeline -> {
-                   // Bukkit.getScheduler().runTask(replay, () -> {
-                    replay.getFoliaLib().getScheduler().runNextTick(task -> {
-                        new ReplaySession(timeline, viewer, replay).start();
-                    });
-                })
-                .exceptionally(ex -> {
-                    replay.getLogger().log(java.util.logging.Level.SEVERE, "Failed to load replay: " + name, ex);
-                    viewer.sendMessage("§cFailed to load replay: " + name);
-                    return null;
-                });
-    }
-
 
     public void shutdown() {
         for (RecordingSession s : activeSessions.values())

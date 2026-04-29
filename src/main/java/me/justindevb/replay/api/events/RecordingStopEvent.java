@@ -1,4 +1,5 @@
 package me.justindevb.replay.api.events;
+
 import me.justindevb.replay.RecordingSession;
 import org.bukkit.event.Event;
 import org.bukkit.event.HandlerList;
@@ -13,16 +14,16 @@ public class RecordingStopEvent extends Event {
         this.session = session;
     }
 
+    public static HandlerList getHandlerList() {
+        return HANDLERS;
+    }
+
     public RecordingSession getSession() {
         return session;
     }
 
     @Override
     public @NotNull HandlerList getHandlers() {
-        return HANDLERS;
-    }
-
-    public static HandlerList getHandlerList() {
         return HANDLERS;
     }
 }

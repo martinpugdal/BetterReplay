@@ -1,21 +1,20 @@
 package me.justindevb.replay.api;
 
-import me.justindevb.replay.ReplaySession;
-import org.bukkit.entity.Player;
-
 import java.io.File;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import me.justindevb.replay.ReplaySession;
+import org.bukkit.entity.Player;
 
 public interface ReplayManager {
 
     /**
      * Starts recording a new replay session.
      *
-     * @param name The session name
-     * @param players The players to record
+     * @param name            The session name
+     * @param players         The players to record
      * @param durationSeconds Duration in seconds (-1 for infinite)
      * @return true if the session was started, false if a session with that name already exists
      */
@@ -37,6 +36,7 @@ public interface ReplayManager {
 
     /**
      * Start a replay
+     *
      * @param viewer
      * @return
      */
@@ -44,6 +44,7 @@ public interface ReplayManager {
 
     /**
      * Stop a replay
+     *
      * @param replaySession
      * @return
      */
@@ -51,12 +52,14 @@ public interface ReplayManager {
 
     /**
      * Collection of all active replays
+     *
      * @return
      */
     Collection<?> getActiveReplays();
 
     /**
      * List of all saved replays
+     *
      * @return
      */
     CompletableFuture<List<String>> listSavedReplays();
@@ -78,6 +81,7 @@ public interface ReplayManager {
 
     /**
      * Get a replay file
+     *
      * @param name
      * @return
      */

@@ -1,4 +1,5 @@
 package me.justindevb.replay.api.events;
+
 import me.justindevb.replay.ReplaySession;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Event;
@@ -16,6 +17,10 @@ public class ReplayStopEvent extends Event {
         this.session = session;
     }
 
+    public static HandlerList getHandlerList() {
+        return HANDLERS;
+    }
+
     public Player getViewer() {
         return this.viewer;
     }
@@ -26,10 +31,6 @@ public class ReplayStopEvent extends Event {
 
     @Override
     public @NotNull HandlerList getHandlers() {
-        return HANDLERS;
-    }
-
-    public static HandlerList getHandlerList() {
         return HANDLERS;
     }
 }

@@ -1,10 +1,11 @@
 package me.justindevb.replay.api.events;
+
+import java.util.Collection;
 import me.justindevb.replay.RecordingSession;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Event;
 import org.bukkit.event.HandlerList;
 import org.jetbrains.annotations.NotNull;
-import java.util.Collection;
 
 public class RecordingStartEvent extends Event {
     private static final HandlerList HANDLERS = new HandlerList();
@@ -21,6 +22,9 @@ public class RecordingStartEvent extends Event {
         this.durationSeconds = durationSeconds;
     }
 
+    public static HandlerList getHandlerList() {
+        return HANDLERS;
+    }
 
     public @NotNull String getRecordingName() {
         return recordingName;
@@ -40,10 +44,6 @@ public class RecordingStartEvent extends Event {
 
     @Override
     public @NotNull HandlerList getHandlers() {
-        return HANDLERS;
-    }
-
-    public static HandlerList getHandlerList() {
         return HANDLERS;
     }
 

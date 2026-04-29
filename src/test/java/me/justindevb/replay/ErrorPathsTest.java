@@ -1,19 +1,18 @@
 package me.justindevb.replay;
 
-import me.justindevb.replay.recording.TimelineEvent;
-import me.justindevb.replay.util.io.ReplayCompressor;
-import me.justindevb.replay.util.VersionUtil;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
-import me.justindevb.replay.recording.TimelineEventAdapter;
-import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.Test;
-
 import java.io.IOException;
 import java.lang.reflect.Type;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import me.justindevb.replay.recording.TimelineEvent;
+import me.justindevb.replay.recording.TimelineEventAdapter;
+import me.justindevb.replay.util.io.ReplayCompressor;
+import me.justindevb.replay.util.version.VersionUtil;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
 

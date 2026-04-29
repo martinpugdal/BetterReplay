@@ -18,7 +18,8 @@ public final class ReplayCompressor {
     private static final int GZIP_MAGIC_1 = 0x1f;
     private static final int GZIP_MAGIC_2 = 0x8b;
 
-    private ReplayCompressor() {}
+    private ReplayCompressor() {
+    }
 
     /**
      * GZIP-compress a JSON string and return the raw bytes.
@@ -46,9 +47,9 @@ public final class ReplayCompressor {
      */
     public static boolean isGzipCompressed(byte[] bytes) {
         return bytes != null
-                && bytes.length >= 2
-                && (bytes[0] & 0xFF) == GZIP_MAGIC_1
-                && (bytes[1] & 0xFF) == GZIP_MAGIC_2;
+            && bytes.length >= 2
+            && (bytes[0] & 0xFF) == GZIP_MAGIC_1
+            && (bytes[1] & 0xFF) == GZIP_MAGIC_2;
     }
 
     /**

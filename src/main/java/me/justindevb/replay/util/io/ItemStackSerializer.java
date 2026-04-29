@@ -1,14 +1,14 @@
 package me.justindevb.replay.util.io;
 
-import org.bukkit.inventory.ItemStack;
-import org.bukkit.util.io.BukkitObjectInputStream;
-
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.Base64;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.util.io.BukkitObjectInputStream;
 
 public final class ItemStackSerializer {
-    private ItemStackSerializer() {}
+    private ItemStackSerializer() {
+    }
 
     /**
      * Serialize an ItemStack to a Base64 string using the modern Paper API.
@@ -36,11 +36,10 @@ public final class ItemStackSerializer {
         return ItemStack.deserializeBytes(bytes);
     }
 
-    @SuppressWarnings("deprecation")
     private static ItemStack deserializeLegacy(byte[] bytes) {
         try (
-                ByteArrayInputStream inputStream = new ByteArrayInputStream(bytes);
-                BukkitObjectInputStream dataInput = new BukkitObjectInputStream(inputStream)
+            ByteArrayInputStream inputStream = new ByteArrayInputStream(bytes);
+            BukkitObjectInputStream dataInput = new BukkitObjectInputStream(inputStream)
         ) {
             Object read = dataInput.readObject();
             return read instanceof ItemStack item ? item : null;

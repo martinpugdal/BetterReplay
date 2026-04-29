@@ -18,6 +18,10 @@ public class ReplayStartEvent extends Event {
         this.session = session;
     }
 
+    public static HandlerList getHandlerList() {
+        return HANDLERS;
+    }
+
     /**
      *
      * @return Who is watching the replay
@@ -32,10 +36,6 @@ public class ReplayStartEvent extends Event {
 
     @Override
     public @NotNull HandlerList getHandlers() {
-        return HANDLERS;
-    }
-
-    public static HandlerList getHandlerList() {
         return HANDLERS;
     }
 

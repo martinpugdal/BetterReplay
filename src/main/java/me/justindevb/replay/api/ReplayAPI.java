@@ -6,7 +6,8 @@ public final class ReplayAPI {
 
     private static ReplayManager manager;
 
-    private ReplayAPI() {}
+    private ReplayAPI() {
+    }
 
     public static void init(ReplayManager replayManager) {
         if (manager != null)

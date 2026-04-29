@@ -13,18 +13,17 @@ import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEn
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerPlayerInfoUpdate;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerSpawnEntity;
 import io.github.retrooper.packetevents.util.SpigotConversionUtil;
-import me.justindevb.replay.Replay;
-import me.justindevb.replay.util.FloodgateHook;
-import net.kyori.adventure.text.Component;
-import org.bukkit.Location;
-import org.bukkit.entity.Player;
-
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
+import me.justindevb.replay.Replay;
+import me.justindevb.replay.util.integration.FloodgateHook;
+import net.kyori.adventure.text.Component;
+import org.bukkit.Location;
+import org.bukkit.entity.Player;
 
 public class SpawnFakePlayer {
 
@@ -64,10 +63,9 @@ public class SpawnFakePlayer {
             try {
                 textures = MojangAPIUtil.requestPlayerTextureProperties(skinUuid);
             } catch (Exception ignored) {
-                textures = Collections.emptyList();
             }
 
-            if ((textures == null || textures.isEmpty()) && !skinUuid.equals(profileUuid)) {
+            if (textures.isEmpty() && !skinUuid.equals(profileUuid)) {
                 try {
                     textures = MojangAPIUtil.requestPlayerTextureProperties(profileUuid);
                 } catch (Exception ignored) {
@@ -75,10 +73,10 @@ public class SpawnFakePlayer {
                 }
             }
 
-            if (textures == null || textures.isEmpty()) {
+            if (textures.isEmpty()) {
                 try {
                     textures = MojangAPIUtil.requestPlayerTextureProperties(
-                            UUID.fromString("069a79f444e94726a5befca90e38aaf5") // Notch
+                        UUID.fromString("069a79f444e94726a5befca90e38aaf5") // Notch
                     );
                 } catch (Exception ignored) {
                     textures = Collections.emptyList();
@@ -120,21 +118,21 @@ public class SpawnFakePlayer {
         playerInfoList.add(new WrapperPlayServerPlayerInfoUpdate.PlayerInfo(profile));
 
         WrapperPlayServerPlayerInfoUpdate infoPacket =
-                new WrapperPlayServerPlayerInfoUpdate(
-                        WrapperPlayServerPlayerInfoUpdate.Action.ADD_PLAYER,
-                        playerInfoList
-                );
+            new WrapperPlayServerPlayerInfoUpdate(
+                WrapperPlayServerPlayerInfoUpdate.Action.ADD_PLAYER,
+                playerInfoList
+            );
 
         PacketEvents.getAPI().getPlayerManager().sendPacket(viewer, infoPacket);
 
         WrapperPlayServerSpawnEntity spawnPacket = new WrapperPlayServerSpawnEntity(
-                entityId,
-                fakeUuid,
-                EntityTypes.PLAYER,
-                SpigotConversionUtil.fromBukkitLocation(spawnLocation),
-                spawnLocation.getYaw(),
-                0,
-                new Vector3d(0, 0, 0)
+            entityId,
+            fakeUuid,
+            EntityTypes.PLAYER,
+            SpigotConversionUtil.fromBukkitLocation(spawnLocation),
+            spawnLocation.getYaw(),
+            0,
+            new Vector3d(0, 0, 0)
         );
 
         PacketEvents.getAPI().getPlayerManager().sendPacket(viewer, spawnPacket);
@@ -151,15 +149,15 @@ public class SpawnFakePlayer {
         List<EntityData<?>> displayMeta = new ArrayList<>();
 
         displayMeta.add(new EntityData<>(
-                2,
-                EntityDataTypes.OPTIONAL_ADV_COMPONENT,
-                Optional.of(Component.text(name))
+            2,
+            EntityDataTypes.OPTIONAL_ADV_COMPONENT,
+            Optional.of(Component.text(name))
         ));
 
         displayMeta.add(new EntityData<>(
-                3,
-                EntityDataTypes.BOOLEAN,
-                true
+            3,
+            EntityDataTypes.BOOLEAN,
+            true
         ));
 
         WrapperPlayServerEntityMetadata metadataPacket = new WrapperPlayServerEntityMetadata(entityId, displayMeta);
@@ -171,18 +169,18 @@ public class SpawnFakePlayer {
         int SKIN_LAYER_INDEX = PacketEvents.getAPI().getPlayerManager().getClientVersion(viewer).isNewerThanOrEquals(ClientVersion.V_1_21_9) ? 16 : 17;
 
         byte skinFlags = (byte) (
-                0x01 | // cape
-                        0x02 | // jacket
-                        0x04 | // left sleeve
-                        0x08 | // right sleeve
-                        0x10 | // left pants
-                        0x20 | // right pants
-                        0x40   // hat
+            0x01 | // cape
+                0x02 | // jacket
+                0x04 | // left sleeve
+                0x08 | // right sleeve
+                0x10 | // left pants
+                0x20 | // right pants
+                0x40   // hat
         );
         skinMeta.add(new EntityData<>(
-                SKIN_LAYER_INDEX,
-                EntityDataTypes.BYTE,
-                skinFlags
+            SKIN_LAYER_INDEX,
+            EntityDataTypes.BYTE,
+            skinFlags
         ));
 
         WrapperPlayServerEntityMetadata metadataPacket = new WrapperPlayServerEntityMetadata(entityId, skinMeta);

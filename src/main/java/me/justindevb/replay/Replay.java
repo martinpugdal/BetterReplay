@@ -3,24 +3,24 @@ package me.justindevb.replay;
 import com.github.retrooper.packetevents.PacketEvents;
 import com.github.retrooper.packetevents.event.PacketListenerPriority;
 import com.tcoded.folialib.FoliaLib;
-import org.bstats.bukkit.Metrics;
 import io.github.retrooper.packetevents.factory.spigot.SpigotPacketEventsBuilder;
+import java.util.logging.Level;
 import me.justindevb.replay.api.ReplayAPI;
 import me.justindevb.replay.listeners.PacketEventsListener;
-import me.justindevb.replay.util.ReplayCache;
-import me.justindevb.replay.util.UpdateChecker;
 import me.justindevb.replay.storage.FileReplayStorage;
 import me.justindevb.replay.storage.MySQLConnectionManager;
 import me.justindevb.replay.storage.MySQLReplayStorage;
 import me.justindevb.replay.storage.ReplayStorage;
+import me.justindevb.replay.util.cache.ReplayCache;
+import me.justindevb.replay.util.version.UpdateChecker;
+import org.bstats.bukkit.Metrics;
 import org.bukkit.command.PluginCommand;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.plugin.java.JavaPlugin;
 
-import java.util.logging.Level;
-
 public class Replay extends JavaPlugin {
     private static Replay instance;
+    private final ReplayRegistry replayRegistry = new ReplayRegistry();
     private RecorderManager recorderManager;
     private ReplayStorage storage = null;
     private MySQLConnectionManager connectionManager;
@@ -28,12 +28,16 @@ public class Replay extends JavaPlugin {
     private ReplayManagerImpl manager;
     private FoliaLib foliaLib;
 
+    public static Replay getInstance() {
+        return instance;
+    }
+
     @Override
     public void onLoad() {
         PacketEvents.setAPI(SpigotPacketEventsBuilder.build(this));
         PacketEvents.getAPI().load();
 
-        PacketEvents.getAPI().getEventManager().registerListener(new PacketEventsListener(this), PacketListenerPriority.LOWEST);
+        PacketEvents.getAPI().getEventManager().registerListener(new PacketEventsListener(this, replayRegistry), PacketListenerPriority.LOWEST);
 
     }
 
@@ -44,7 +48,7 @@ public class Replay extends JavaPlugin {
         foliaLib = new FoliaLib(this);
 
         recorderManager = new RecorderManager(this);
-        manager = new ReplayManagerImpl(this, recorderManager);
+        manager = new ReplayManagerImpl(this, recorderManager, replayRegistry);
         ReplayCommand replayCommand = new ReplayCommand(manager);
         initConfig();
 
@@ -61,7 +65,6 @@ public class Replay extends JavaPlugin {
 
         initBstats();
 
-
         checkForUpdate();
     }
 
@@ -69,7 +72,7 @@ public class Replay extends JavaPlugin {
     public void onDisable() {
         recorderManager.shutdown();
 
-        for (ReplaySession session : ReplayRegistry.getActiveSessions()) {
+        for (ReplaySession session : replayRegistry.getActiveSessions()) {
             if (session != null)
                 session.stop();
         }
@@ -81,12 +84,7 @@ public class Replay extends JavaPlugin {
             connectionManager.shutdown();
 
 
-
         instance = null;
-    }
-
-    public static Replay getInstance() {
-        return instance;
     }
 
     public RecorderManager getRecorderManager() {
@@ -95,6 +93,23 @@ public class Replay extends JavaPlugin {
 
     public ReplayStorage getReplayStorage() {
         return storage;
+    }
+
+    public ReplayCache getReplayCache() {
+        return replayCache;
+    }
+
+    public ReplayManagerImpl getReplayManagerImpl() {
+        return manager;
+    }
+
+    public FoliaLib getFoliaLib() {
+        return foliaLib;
+    }
+
+    public void initBstats() {
+        int pluginId = 29341;
+        new Metrics(this, pluginId);
     }
 
     private void initConfig() {
@@ -114,6 +129,18 @@ public class Replay extends JavaPlugin {
         config.addDefault("General.MySQL.database", "database");
         config.addDefault("General.MySQL.user", "username");
         config.addDefault("General.MySQL.password", "password");
+
+        // Capture chunks around tracked players at recording time so the replay
+        // shows the original surroundings even if the live world is later changed
+        // (e.g. a regenerating mine).
+        config.addDefault("WorldSnapshot.Enabled", true);
+        // Chunk radius around each tracked player. 1 = a 3x3 grid (covers a 16-block radius).
+        config.addDefault("WorldSnapshot.Radius-Chunks", 1);
+        // Hard cap on chunks per recording to bound memory usage on long sessions.
+        config.addDefault("WorldSnapshot.Max-Chunks-Per-Session", 256);
+        // Also record block changes from non-player sources (explosions, water/lava
+        // flow, decay, mob-driven block changes) inside the snapshotted region.
+        config.addDefault("WorldSnapshot.Capture-Non-Player-Events", true);
     }
 
     private void checkForUpdate() {
@@ -152,21 +179,5 @@ public class Replay extends JavaPlugin {
         replayCache = new ReplayCache();
         getReplayStorage().listReplays().thenAccept(replays -> replayCache.setReplays(replays));
     }
-
-    public ReplayCache getReplayCache() {
-        return replayCache;
-    }
-
-    public ReplayManagerImpl getReplayManagerImpl() {
-        return manager;
-    }
-
-    public void initBstats() {
-        int pluginId = 29341;
-        new Metrics(this, pluginId);
-    }
-
-    public FoliaLib getFoliaLib() {
-        return foliaLib;
-    }
 }
+

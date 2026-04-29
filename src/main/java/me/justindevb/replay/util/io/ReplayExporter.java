@@ -6,42 +6,23 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.google.gson.reflect.TypeToken;
-import java.io.*;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.OutputStreamWriter;
 import java.nio.file.Files;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.zip.GZIPOutputStream;
 
 public class ReplayExporter {
 
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
-
-    public static class ExportReplay {
-        public int schemaVersion = 1;
-        public int tickRate = 20;
-        public String world;
-        public long startTime;
-        public int durationTicks;
-        public List<ExportEntity> entities = new ArrayList<>();
-        public List<ExportChunk> chunks = new ArrayList<>();
-        public List<Frame> frames = new ArrayList<>();
-        public List<Map<String,Object>> rawPackets = null;
-    }
-    public static class ExportEntity {
-        public int exportId;
-        public int serverEntityId;
-        public String uuid;
-        public String type;
-        public String name;
-        public List<Map<String,String>> skin;
-    }
-    public static class ExportChunk {
-        public int cx, cz;
-        public String data;
-    }
-    public static class Frame {
-        public int tick;
-        public List<Map<String,Object>> events = new ArrayList<>();
-    }
 
     /**
      * Convert a recording file (JSON timeline) into a web-friendly export.
@@ -54,10 +35,12 @@ public class ReplayExporter {
         JsonElement el = JsonParser.parseString(raw);
         List<Map<String, Object>> timeline;
         if (el.isJsonArray()) {
-            timeline = GSON.fromJson(el, new TypeToken<List<Map<String, Object>>>(){}.getType());
+            timeline = GSON.fromJson(el, new TypeToken<List<Map<String, Object>>>() {
+            }.getType());
         } else {
             JsonObject obj = el.getAsJsonObject();
-            timeline = GSON.fromJson(obj.get("timeline"), new TypeToken<List<Map<String, Object>>>(){}.getType());
+            timeline = GSON.fromJson(obj.get("timeline"), new TypeToken<List<Map<String, Object>>>() {
+            }.getType());
         }
 
         ExportReplay export = new ExportReplay();
@@ -68,7 +51,7 @@ public class ReplayExporter {
 
         Map<Integer, ExportEntity> entityMap = new LinkedHashMap<>();
         int nextExportId = 1;
-        for (Map<String,Object> ev : timeline) {
+        for (Map<String, Object> ev : timeline) {
             Number n = (Number) ev.get("entityId");
             if (n == null) continue;
             int serverId = n.intValue();
@@ -84,10 +67,10 @@ public class ReplayExporter {
                 e.type = t != null ? t.toString() : (ev.get("type") != null ? ev.get("type").toString() : "UNKNOWN");
                 Object textures = ev.get("textures");
                 if (textures instanceof List) {
-                    List<Map<String,String>> skinProps = new ArrayList<>();
-                    for (Object o : (List<?>)textures) {
-                        if (o instanceof Map<?,?> m) {
-                            Map<String,String> prop = new HashMap<>();
+                    List<Map<String, String>> skinProps = new ArrayList<>();
+                    for (Object o : (List<?>) textures) {
+                        if (o instanceof Map<?, ?> m) {
+                            Map<String, String> prop = new HashMap<>();
                             Object nameVal = m.get("name");
                             prop.put("name", nameVal != null ? String.valueOf(nameVal) : "textures");
                             prop.put("value", String.valueOf(m.get("value")));
@@ -103,12 +86,16 @@ public class ReplayExporter {
         export.entities.addAll(entityMap.values());
 
         Map<Integer, Frame> frames = new LinkedHashMap<>();
-        for (Map<String,Object> ev : timeline) {
+        for (Map<String, Object> ev : timeline) {
             Number tickN = (Number) ev.get("tick");
             if (tickN == null) continue;
             int tick = tickN.intValue();
-            Frame f = frames.computeIfAbsent(tick, k -> { Frame ff = new Frame(); ff.tick = k; return ff; });
-            Map<String,Object> webEvent = convertToWebEvent(ev, entityMap);
+            Frame f = frames.computeIfAbsent(tick, k -> {
+                Frame ff = new Frame();
+                ff.tick = k;
+                return ff;
+            });
+            Map<String, Object> webEvent = convertToWebEvent(ev, entityMap);
             if (webEvent != null) f.events.add(webEvent);
         }
         export.frames.addAll(frames.values());
@@ -129,10 +116,10 @@ public class ReplayExporter {
         }
     }
 
-    private static int estimateDurationTicks(List<Map<String,Object>> timeline) {
+    private static int estimateDurationTicks(List<Map<String, Object>> timeline) {
         int max = 0;
-        for (Map<String,Object> ev : timeline) {
-            Number t = (Number)ev.get("tick");
+        for (Map<String, Object> ev : timeline) {
+            Number t = (Number) ev.get("tick");
             if (t != null && t.intValue() > max) max = t.intValue();
         }
         return max + 1;
@@ -142,8 +129,8 @@ public class ReplayExporter {
      * Convert a recorded raw event to a normalized, web-friendly event map.
      * This is the key mapping: translate packet-like data to simple semantic events.
      */
-    private static Map<String,Object> convertToWebEvent(Map<String,Object> raw, Map<Integer, ExportEntity> entityMap) {
-        Map<String,Object> out = new LinkedHashMap<>();
+    private static Map<String, Object> convertToWebEvent(Map<String, Object> raw, Map<Integer, ExportEntity> entityMap) {
+        Map<String, Object> out = new LinkedHashMap<>();
         String rawType = (String) raw.get("type");
         Number entityIdN = (Number) raw.get("entityId");
         if (entityIdN != null) {
@@ -155,7 +142,7 @@ public class ReplayExporter {
         switch (rawType) {
             case "player_move":
             case "entity_move":
-                out.put("type","move");
+                out.put("type", "move");
                 out.put("x", raw.get("x"));
                 out.put("y", raw.get("y"));
                 out.put("z", raw.get("z"));
@@ -169,18 +156,18 @@ public class ReplayExporter {
 
             case "swing":
             case "animation":
-                out.put("type","swing");
+                out.put("type", "swing");
                 return out;
 
             case "use_entity":
             case "attack":
-                out.put("type","attack");
+                out.put("type", "attack");
                 out.put("targetEntity", raw.get("targetId"));
-                out.put("hand", raw.getOrDefault("hand","main"));
+                out.put("hand", raw.getOrDefault("hand", "main"));
                 return out;
 
             case "block_place":
-                out.put("type","block_place");
+                out.put("type", "block_place");
                 out.put("x", raw.get("x"));
                 out.put("y", raw.get("y"));
                 out.put("z", raw.get("z"));
@@ -190,7 +177,7 @@ public class ReplayExporter {
                 return out;
 
             case "block_break":
-                out.put("type","block_break");
+                out.put("type", "block_break");
                 out.put("x", raw.get("x"));
                 out.put("y", raw.get("y"));
                 out.put("z", raw.get("z"));
@@ -198,17 +185,48 @@ public class ReplayExporter {
                 return out;
 
             case "chat":
-                out.put("type","chat");
+                out.put("type", "chat");
                 out.put("message", raw.get("message"));
                 return out;
 
 
             default:
-                Map<String,Object> rawcopy = new LinkedHashMap<>(raw);
-                out.put("type","raw");
+                Map<String, Object> rawcopy = new LinkedHashMap<>(raw);
+                out.put("type", "raw");
                 out.put("payload", rawcopy);
                 return out;
         }
+    }
+
+    public static class ExportReplay {
+        public int schemaVersion = 1;
+        public int tickRate = 20;
+        public String world;
+        public long startTime;
+        public int durationTicks;
+        public List<ExportEntity> entities = new ArrayList<>();
+        public List<ExportChunk> chunks = new ArrayList<>();
+        public List<Frame> frames = new ArrayList<>();
+        public List<Map<String, Object>> rawPackets = null;
+    }
+
+    public static class ExportEntity {
+        public int exportId;
+        public int serverEntityId;
+        public String uuid;
+        public String type;
+        public String name;
+        public List<Map<String, String>> skin;
+    }
+
+    public static class ExportChunk {
+        public int cx, cz;
+        public String data;
+    }
+
+    public static class Frame {
+        public int tick;
+        public List<Map<String, Object>> events = new ArrayList<>();
     }
 }
 
