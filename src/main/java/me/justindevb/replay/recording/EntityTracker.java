@@ -1,12 +1,16 @@
 package me.justindevb.replay.recording;
 
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
-
-import java.util.*;
 
 /**
  * Tracks which players and entities are being recorded.
@@ -14,10 +18,9 @@ import java.util.*;
  */
 public class EntityTracker {
 
+    private static final double NEARBY_RADIUS_SQUARED = 32.0 * 32.0;
     private final Set<UUID> trackedPlayers;
     private final Map<UUID, EntityType> trackedEntities = new HashMap<>();
-
-    private static final double NEARBY_RADIUS_SQUARED = 32.0 * 32.0;
 
     public EntityTracker(Collection<Player> players) {
         this.trackedPlayers = new HashSet<>();

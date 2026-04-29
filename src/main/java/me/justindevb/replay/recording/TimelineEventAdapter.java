@@ -1,7 +1,13 @@
 package me.justindevb.replay.recording;
 
-import com.google.gson.*;
-
+import com.google.gson.JsonArray;
+import com.google.gson.JsonDeserializationContext;
+import com.google.gson.JsonDeserializer;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParseException;
+import com.google.gson.JsonSerializationContext;
+import com.google.gson.JsonSerializer;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.List;
@@ -38,6 +44,40 @@ import java.util.List;
 public class TimelineEventAdapter implements JsonSerializer<TimelineEvent>, JsonDeserializer<TimelineEvent> {
 
     // ── Serialization ─────────────────────────────────────────
+
+    private static String optString(JsonObject obj, String key) {
+        return obj.has(key) && !obj.get(key).isJsonNull() ? obj.get(key).getAsString() : null;
+    }
+
+    // ── Deserialization ───────────────────────────────────────
+    //
+    // Each case provides sensible defaults for fields that may be absent in older
+    // replay files. When a future version adds a new field to a record, add a
+    // default here and old files will continue to load without any migration step.
+
+    private static int optInt(JsonObject obj, String key, int def) {
+        return obj.has(key) ? obj.get(key).getAsInt() : def;
+    }
+
+    // ── Helpers ───────────────────────────────────────────────
+
+    private static double optDouble(JsonObject obj, String key, double def) {
+        return obj.has(key) ? obj.get(key).getAsDouble() : def;
+    }
+
+    private static float optFloat(JsonObject obj, String key, float def) {
+        return obj.has(key) ? obj.get(key).getAsFloat() : def;
+    }
+
+    private static List<String> readStringList(JsonObject obj, String key) {
+        if (!obj.has(key) || !obj.get(key).isJsonArray()) return List.of();
+        JsonArray arr = obj.getAsJsonArray(key);
+        List<String> list = new ArrayList<>(arr.size());
+        for (JsonElement el : arr) {
+            list.add(el.isJsonNull() ? null : el.getAsString());
+        }
+        return list;
+    }
 
     @Override
     public JsonElement serialize(TimelineEvent event, Type typeOfSrc, JsonSerializationContext ctx) {
@@ -138,6 +178,13 @@ public class TimelineEventAdapter implements JsonSerializer<TimelineEvent>, Json
                 loc.addProperty("yaw", e.locYaw());
                 loc.addProperty("pitch", e.locPitch());
                 json.add("loc", loc);
+                if (e.vx() != 0 || e.vy() != 0 || e.vz() != 0) {
+                    JsonObject vel = new JsonObject();
+                    vel.addProperty("x", e.vx());
+                    vel.addProperty("y", e.vy());
+                    vel.addProperty("z", e.vz());
+                    json.add("velocity", vel);
+                }
             }
             case TimelineEvent.Attack e -> {
                 json.addProperty("tick", e.tick());
@@ -180,6 +227,7 @@ public class TimelineEventAdapter implements JsonSerializer<TimelineEvent>, Json
                 json.addProperty("x", e.x());
                 json.addProperty("y", e.y());
                 json.addProperty("z", e.z());
+                if (e.blockData() != null) json.addProperty("blockData", e.blockData());
             }
             case TimelineEvent.EntityDeath e -> {
                 json.addProperty("tick", e.tick());
@@ -200,12 +248,6 @@ public class TimelineEventAdapter implements JsonSerializer<TimelineEvent>, Json
         return json;
     }
 
-    // ── Deserialization ───────────────────────────────────────
-    //
-    // Each case provides sensible defaults for fields that may be absent in older
-    // replay files. When a future version adds a new field to a record, add a
-    // default here and old files will continue to load without any migration step.
-
     @Override
     public TimelineEvent deserialize(JsonElement jsonElement, Type typeOfT,
                                      JsonDeserializationContext ctx) throws JsonParseException {
@@ -218,80 +260,84 @@ public class TimelineEventAdapter implements JsonSerializer<TimelineEvent>, Json
 
         return switch (type) {
             case "player_move" -> new TimelineEvent.PlayerMove(
-                    tick, uuid,
-                    optString(obj, "name"),
-                    optString(obj, "world"),
-                    optDouble(obj, "x", 0), optDouble(obj, "y", 0), optDouble(obj, "z", 0),
-                    optFloat(obj, "yaw", 0f), optFloat(obj, "pitch", 0f),
-                    optString(obj, "pose")  // null in older recordings — adapter provides the default
+                tick, uuid,
+                optString(obj, "name"),
+                optString(obj, "world"),
+                optDouble(obj, "x", 0), optDouble(obj, "y", 0), optDouble(obj, "z", 0),
+                optFloat(obj, "yaw", 0f), optFloat(obj, "pitch", 0f),
+                optString(obj, "pose")  // null in older recordings — adapter provides the default
             );
             case "entity_move" -> new TimelineEvent.EntityMove(
-                    tick, uuid,
-                    optString(obj, "etype"),
-                    optString(obj, "world"),
-                    optDouble(obj, "x", 0), optDouble(obj, "y", 0), optDouble(obj, "z", 0),
-                    optFloat(obj, "yaw", 0f), optFloat(obj, "pitch", 0f)
+                tick, uuid,
+                optString(obj, "etype"),
+                optString(obj, "world"),
+                optDouble(obj, "x", 0), optDouble(obj, "y", 0), optDouble(obj, "z", 0),
+                optFloat(obj, "yaw", 0f), optFloat(obj, "pitch", 0f)
             );
             case "inventory_update" -> new TimelineEvent.InventoryUpdate(
-                    tick, uuid,
-                    optString(obj, "mainHand"),
-                    optString(obj, "offHand"),
-                    readStringList(obj, "armor"),
-                    readStringList(obj, "contents")
+                tick, uuid,
+                optString(obj, "mainHand"),
+                optString(obj, "offHand"),
+                readStringList(obj, "armor"),
+                readStringList(obj, "contents")
             );
             case "held_item_change" -> new TimelineEvent.HeldItemChange(
-                    tick, uuid,
-                    optString(obj, "mainHand"),
-                    optString(obj, "offHand")
+                tick, uuid,
+                optString(obj, "mainHand"),
+                optString(obj, "offHand")
             );
             case "block_break" -> new TimelineEvent.BlockBreak(
-                    tick, uuid,
-                    optString(obj, "world"),
-                    optInt(obj, "x", 0), optInt(obj, "y", 0), optInt(obj, "z", 0),
-                    optString(obj, "blockData")
+                tick, uuid,
+                optString(obj, "world"),
+                optInt(obj, "x", 0), optInt(obj, "y", 0), optInt(obj, "z", 0),
+                optString(obj, "blockData")
             );
             // "block_break_complete" is recorded when a player starts damaging a block;
             // "block_break_start" is an alias accepted for backward compatibility.
             case "block_break_complete", "block_break_start" -> new TimelineEvent.BlockBreakComplete(
-                    tick, uuid,
-                    optString(obj, "world"),
-                    optInt(obj, "x", 0), optInt(obj, "y", 0), optInt(obj, "z", 0)
+                tick, uuid,
+                optString(obj, "world"),
+                optInt(obj, "x", 0), optInt(obj, "y", 0), optInt(obj, "z", 0)
             );
             case "block_break_stage" -> new TimelineEvent.BlockBreakStage(
-                    tick, uuid,
-                    optString(obj, "world"),
-                    optInt(obj, "x", 0), optInt(obj, "y", 0), optInt(obj, "z", 0),
-                    optInt(obj, "stage", 0)
+                tick, uuid,
+                optString(obj, "world"),
+                optInt(obj, "x", 0), optInt(obj, "y", 0), optInt(obj, "z", 0),
+                optInt(obj, "stage", 0)
             );
             case "block_place" -> new TimelineEvent.BlockPlace(
-                    tick, uuid,
-                    optString(obj, "world"),
-                    optInt(obj, "x", 0), optInt(obj, "y", 0), optInt(obj, "z", 0),
-                    optString(obj, "blockData"),
-                    optString(obj, "replacedBlockData")
+                tick, uuid,
+                optString(obj, "world"),
+                optInt(obj, "x", 0), optInt(obj, "y", 0), optInt(obj, "z", 0),
+                optString(obj, "blockData"),
+                optString(obj, "replacedBlockData")
             );
             case "item_drop" -> {
                 // The nested location object was stored under "loc" in recording
                 // but some versions may have used "location" — accept both.
                 JsonObject loc = obj.has("loc") ? obj.getAsJsonObject("loc")
-                        : obj.has("location") ? obj.getAsJsonObject("location")
-                        : null;
+                    : obj.has("location") ? obj.getAsJsonObject("location")
+                      : null;
+                JsonObject vel = obj.has("velocity") ? obj.getAsJsonObject("velocity") : null;
                 yield new TimelineEvent.ItemDrop(
-                        tick, uuid,
-                        optString(obj, "item"),
-                        loc != null ? optString(loc, "world") : null,
-                        loc != null ? optDouble(loc, "x", 0) : 0,
-                        loc != null ? optDouble(loc, "y", 0) : 0,
-                        loc != null ? optDouble(loc, "z", 0) : 0,
-                        loc != null ? optFloat(loc, "yaw", 0f) : 0f,
-                        loc != null ? optFloat(loc, "pitch", 0f) : 0f
+                    tick, uuid,
+                    optString(obj, "item"),
+                    loc != null ? optString(loc, "world") : null,
+                    loc != null ? optDouble(loc, "x", 0) : 0,
+                    loc != null ? optDouble(loc, "y", 0) : 0,
+                    loc != null ? optDouble(loc, "z", 0) : 0,
+                    loc != null ? optFloat(loc, "yaw", 0f) : 0f,
+                    loc != null ? optFloat(loc, "pitch", 0f) : 0f,
+                    vel != null ? optDouble(vel, "x", 0) : 0,
+                    vel != null ? optDouble(vel, "y", 0) : 0,
+                    vel != null ? optDouble(vel, "z", 0) : 0
                 );
             }
             case "attack" -> new TimelineEvent.Attack(
-                    tick, uuid,
-                    optString(obj, "targetUuid"),
-                    optString(obj, "entityUuid"),
-                    optString(obj, "entityType")
+                tick, uuid,
+                optString(obj, "targetUuid"),
+                optString(obj, "entityUuid"),
+                optString(obj, "entityType")
             );
             case "swing" -> new TimelineEvent.Swing(tick, uuid, optString(obj, "hand"));
             case "sprint_start" -> new TimelineEvent.SprintToggle(tick, uuid, true);
@@ -299,54 +345,27 @@ public class TimelineEventAdapter implements JsonSerializer<TimelineEvent>, Json
             case "sneak_start" -> new TimelineEvent.SneakToggle(tick, uuid, true);
             case "sneak_stop" -> new TimelineEvent.SneakToggle(tick, uuid, false);
             case "damaged" -> new TimelineEvent.Damaged(
-                    tick, uuid,
-                    optString(obj, "entityType"),
-                    optString(obj, "cause"),
-                    optDouble(obj, "finalDamage", 0)
+                tick, uuid,
+                optString(obj, "entityType"),
+                optString(obj, "cause"),
+                optDouble(obj, "finalDamage", 0)
             );
             // Accept both "entity_spawn" and legacy "mob_spawn" type strings.
             case "entity_spawn", "mob_spawn" -> new TimelineEvent.EntitySpawn(
-                    tick, uuid,
-                    optString(obj, "etype"),
-                    optString(obj, "world"),
-                    optDouble(obj, "x", 0), optDouble(obj, "y", 0), optDouble(obj, "z", 0)
+                tick, uuid,
+                optString(obj, "etype"),
+                optString(obj, "world"),
+                optDouble(obj, "x", 0), optDouble(obj, "y", 0), optDouble(obj, "z", 0),
+                optString(obj, "blockData")
             );
             case "entity_death" -> new TimelineEvent.EntityDeath(
-                    tick, uuid,
-                    optString(obj, "etype"),
-                    optString(obj, "world"),
-                    optDouble(obj, "x", 0), optDouble(obj, "y", 0), optDouble(obj, "z", 0)
+                tick, uuid,
+                optString(obj, "etype"),
+                optString(obj, "world"),
+                optDouble(obj, "x", 0), optDouble(obj, "y", 0), optDouble(obj, "z", 0)
             );
             case "player_quit" -> new TimelineEvent.PlayerQuit(tick, uuid);
             default -> throw new JsonParseException("Unknown timeline event type: " + type);
         };
-    }
-
-    // ── Helpers ───────────────────────────────────────────────
-
-    private static String optString(JsonObject obj, String key) {
-        return obj.has(key) && !obj.get(key).isJsonNull() ? obj.get(key).getAsString() : null;
-    }
-
-    private static int optInt(JsonObject obj, String key, int def) {
-        return obj.has(key) ? obj.get(key).getAsInt() : def;
-    }
-
-    private static double optDouble(JsonObject obj, String key, double def) {
-        return obj.has(key) ? obj.get(key).getAsDouble() : def;
-    }
-
-    private static float optFloat(JsonObject obj, String key, float def) {
-        return obj.has(key) ? obj.get(key).getAsFloat() : def;
-    }
-
-    private static List<String> readStringList(JsonObject obj, String key) {
-        if (!obj.has(key) || !obj.get(key).isJsonArray()) return List.of();
-        JsonArray arr = obj.getAsJsonArray(key);
-        List<String> list = new ArrayList<>(arr.size());
-        for (JsonElement el : arr) {
-            list.add(el.isJsonNull() ? null : el.getAsString());
-        }
-        return list;
     }
 }

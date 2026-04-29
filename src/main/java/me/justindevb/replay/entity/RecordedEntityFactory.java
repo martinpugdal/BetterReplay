@@ -1,12 +1,11 @@
 package me.justindevb.replay.entity;
 
+import java.util.UUID;
+import java.util.logging.Logger;
 import me.justindevb.replay.Replay;
 import me.justindevb.replay.recording.TimelineEvent;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
-
-import java.util.UUID;
-import java.util.logging.Logger;
 
 public class RecordedEntityFactory {
     private static final Logger LOGGER = Replay.getInstance().getLogger();
@@ -21,7 +20,7 @@ public class RecordedEntityFactory {
 
         return switch (event) {
             case TimelineEvent.PlayerMove e -> new RecordedPlayer(
-                    uuid, e.name() != null ? e.name() : "Unknown", EntityType.PLAYER, viewer);
+                uuid, e.name() != null ? e.name() : "Unknown", EntityType.PLAYER, viewer);
             case TimelineEvent.EntityMove e -> createFromEtype(uuid, e.etype(), viewer);
             case TimelineEvent.EntitySpawn e -> createFromEtype(uuid, e.etype(), viewer);
             case TimelineEvent.EntityDeath e -> createFromEtype(uuid, e.etype(), viewer);

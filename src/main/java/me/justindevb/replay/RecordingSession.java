@@ -3,12 +3,21 @@ package me.justindevb.replay;
 import com.github.retrooper.packetevents.PacketEvents;
 import com.github.retrooper.packetevents.event.PacketListenerCommon;
 import com.github.retrooper.packetevents.event.PacketListenerPriority;
+import java.io.File;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 import me.justindevb.replay.recording.EntityTracker;
 import me.justindevb.replay.recording.RecordingEventHandler;
 import me.justindevb.replay.recording.RecordingPacketHandler;
 import me.justindevb.replay.recording.TimelineBuilder;
 import me.justindevb.replay.recording.TimelineEvent;
-import me.justindevb.replay.util.ReplayObject;
+import me.justindevb.replay.snapshot.WorldSnapshotter;
+import me.justindevb.replay.util.model.ReplayObject;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.entity.Entity;
@@ -16,9 +25,6 @@ import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
 import org.bukkit.event.HandlerList;
 import org.bukkit.inventory.ItemStack;
-
-import java.io.File;
-import java.util.*;
 
 import static me.justindevb.replay.util.io.ItemStackSerializer.serializeItem;
 
@@ -28,18 +34,17 @@ import static me.justindevb.replay.util.io.ItemStackSerializer.serializeItem;
  */
 public class RecordingSession {
 
+    private static final int INVENTORY_CHECK_INTERVAL = 5;
     private final Replay replay;
     private final String name;
     private final File file;
-
     private final EntityTracker tracker;
     private final TimelineBuilder builder;
     private final RecordingEventHandler eventHandler;
     private final RecordingPacketHandler packetHandler;
-    private PacketListenerCommon packetListenerHandle;
-
-    private static final int INVENTORY_CHECK_INTERVAL = 5;
+    private final WorldSnapshotter snapshotter;
     private final Map<UUID, List<String>> lastInventorySnapshot = new HashMap<>();
+    private PacketListenerCommon packetListenerHandle;
     private int tick = 0;
     private int durationTicks = -1;
     private boolean stopped = false;
@@ -50,9 +55,26 @@ public class RecordingSession {
         this.durationTicks = durationSeconds > 0 ? durationSeconds * 20 : -1;
         this.replay = Replay.getInstance();
 
+        org.bukkit.configuration.file.FileConfiguration cfg = replay != null ? replay.getConfig() : null;
+        boolean snapshotEnabled = cfg != null && cfg.getBoolean("WorldSnapshot.Enabled", true);
+        int radiusChunks = cfg != null ? cfg.getInt("WorldSnapshot.Radius-Chunks", 1) : 1;
+        int maxChunks = cfg != null ? cfg.getInt("WorldSnapshot.Max-Chunks-Per-Session", 256) : 256;
+        boolean captureNonPlayer = cfg != null && cfg.getBoolean("WorldSnapshot.Capture-Non-Player-Events", true);
+
+        this.snapshotter = snapshotEnabled
+            ? new WorldSnapshotter(radiusChunks, maxChunks,
+            replay.getLogger())
+            : null;
+
         this.tracker = new EntityTracker(players);
         this.builder = new TimelineBuilder();
-        this.eventHandler = new RecordingEventHandler(tracker, builder, this::getTick, lastInventorySnapshot::remove);
+        this.eventHandler = new RecordingEventHandler(
+            tracker,
+            builder,
+            this::getTick,
+            lastInventorySnapshot::remove,
+            (snapshotter != null && captureNonPlayer) ? snapshotter::isInsideSnapshot : null
+        );
         this.packetHandler = new RecordingPacketHandler(tracker, builder, this::getTick);
     }
 
@@ -60,15 +82,18 @@ public class RecordingSession {
         if (!file.getParentFile().exists()) file.getParentFile().mkdirs();
 
         Bukkit.getLogger().info("Started recording: " + name + " for " + tracker.getTrackedPlayers().size()
-                + " player(s), duration=" + (durationTicks == -1 ? "∞" : durationTicks / 20 + "s"));
+            + " player(s), duration=" + (durationTicks == -1 ? "∞" : durationTicks / 20 + "s"));
 
         Bukkit.getPluginManager().registerEvents(eventHandler, replay);
         packetListenerHandle = PacketEvents.getAPI().getEventManager().registerListener(packetHandler, PacketListenerPriority.NORMAL);
 
         captureInitialInventory();
+        captureInitialSnapshot();
     }
 
-    /** Called every tick by RecorderManager */
+    /**
+     * Called every tick by RecorderManager
+     */
     public void tick() {
         if (stopped) return;
 
@@ -84,14 +109,18 @@ public class RecordingSession {
             Location loc = p.getLocation();
 
             builder.addEvent(new TimelineEvent.PlayerMove(
-                    tick,
-                    uuid.toString(),
-                    p.getName(),
-                    p.getWorld().getName(),
-                    loc.getX(), loc.getY(), loc.getZ(),
-                    loc.getYaw(), loc.getPitch(),
-                    p.getPose().name()
+                tick,
+                uuid.toString(),
+                p.getName(),
+                p.getWorld().getName(),
+                loc.getX(), loc.getY(), loc.getZ(),
+                loc.getYaw(), loc.getPitch(),
+                p.getPose().name()
             ));
+
+            if (snapshotter != null) {
+                snapshotter.expandAround(p);
+            }
         }
 
         for (Map.Entry<UUID, EntityType> entry : tracker.getTrackedEntities().entrySet()) {
@@ -102,12 +131,12 @@ public class RecordingSession {
             Location entityLoc = e.getLocation();
 
             builder.addEvent(new TimelineEvent.EntityMove(
-                    tick,
-                    uuid.toString(),
-                    e.getType().name(),
-                    entityLoc.getWorld().getName(),
-                    entityLoc.getX(), entityLoc.getY(), entityLoc.getZ(),
-                    entityLoc.getYaw(), entityLoc.getPitch()
+                tick,
+                uuid.toString(),
+                e.getType().name(),
+                entityLoc.getWorld().getName(),
+                entityLoc.getX(), entityLoc.getY(), entityLoc.getZ(),
+                entityLoc.getYaw(), entityLoc.getPitch()
             ));
         }
 
@@ -158,23 +187,24 @@ public class RecordingSession {
         if (!save) return;
 
         ReplayObject replayObject = new ReplayObject(
-                name,
-                builder.getTimeline(),
-                replay.getReplayStorage()
+            name,
+            builder.getTimeline(),
+            snapshotter != null ? snapshotter.getSnapshot() : null,
+            replay.getReplayStorage()
         );
 
         replayObject.save()
-                .thenCompose(v ->
-                        replay.getReplayStorage().listReplays()
-                )
-                .thenAccept(replays -> {
-                    replay.getReplayCache().setReplays(replays);
-                    replay.getLogger().info("Recording " + name + " saved!");
-                })
-                .exceptionally(ex -> {
-                    replay.getLogger().log(java.util.logging.Level.SEVERE, "Failed to save recording: " + name, ex);
-                    return null;
-                });
+            .thenCompose(v ->
+                replay.getReplayStorage().listReplays()
+            )
+            .thenAccept(replays -> {
+                replay.getReplayCache().setReplays(replays);
+                replay.getLogger().info("Recording " + name + " saved!");
+            })
+            .exceptionally(ex -> {
+                replay.getLogger().log(java.util.logging.Level.SEVERE, "Failed to save recording: " + name, ex);
+                return null;
+            });
     }
 
     public boolean isStopped() {
@@ -203,6 +233,15 @@ public class RecordingSession {
             if (p == null || !p.isOnline()) continue;
 
             builder.addEvent(builder.captureInventory(tick, uuid.toString(), p));
+        }
+    }
+
+    private void captureInitialSnapshot() {
+        if (snapshotter == null) return;
+        for (UUID uuid : tracker.getTrackedPlayers()) {
+            Player p = Bukkit.getPlayer(uuid);
+            if (p == null || !p.isOnline()) continue;
+            snapshotter.expandAround(p);
         }
     }
 }

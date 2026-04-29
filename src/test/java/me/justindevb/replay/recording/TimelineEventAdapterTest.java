@@ -4,12 +4,11 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import java.util.List;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
-
-import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -210,12 +209,55 @@ class TimelineEventAdapterTest {
         @Test
         void roundtrip() {
             var original = new TimelineEvent.ItemDrop(
-                    12, "uuid-8", "item-data", "world", 1.0, 2.0, 3.0, 45f, 30f);
+                    12, "uuid-8", "item-data", "world", 1.0, 2.0, 3.0, 45f, 30f, 0.1, 0.2, 0.3);
             var restored = (TimelineEvent.ItemDrop) TimelineEventAdapterTest.this.roundtrip(original);
 
             assertEquals(original.item(), restored.item());
             assertEquals(original.locWorld(), restored.locWorld());
             assertEquals(original.locX(), restored.locX(), 0.001);
+        }
+
+        @Test
+        void roundtrip_preservesVelocity() {
+            var original = new TimelineEvent.ItemDrop(
+                    12, "u", "i", "w", 0, 0, 0, 0f, 0f, 0.5, -0.25, 1.25);
+            var restored = (TimelineEvent.ItemDrop) TimelineEventAdapterTest.this.roundtrip(original);
+
+            assertEquals(0.5, restored.vx(), 0.001);
+            assertEquals(-0.25, restored.vy(), 0.001);
+            assertEquals(1.25, restored.vz(), 0.001);
+        }
+
+        @Test
+        void zeroVelocity_omittedFromJson() {
+            var event = new TimelineEvent.ItemDrop(
+                    0, "u", "i", "w", 0, 0, 0, 0f, 0f, 0, 0, 0);
+            JsonObject json = toJson(event);
+            assertFalse(json.has("velocity"));
+        }
+
+        @Test
+        void nonZeroVelocity_writtenAsNestedObject() {
+            var event = new TimelineEvent.ItemDrop(
+                    0, "u", "i", "w", 0, 0, 0, 0f, 0f, 0.1, 0, 0);
+            JsonObject json = toJson(event);
+            assertTrue(json.has("velocity"));
+            JsonObject vel = json.getAsJsonObject("velocity");
+            assertEquals(0.1, vel.get("x").getAsDouble(), 0.001);
+            assertEquals(0.0, vel.get("y").getAsDouble(), 0.001);
+            assertEquals(0.0, vel.get("z").getAsDouble(), 0.001);
+        }
+
+        @Test
+        void deserialize_missingVelocity_defaultsToZero() {
+            String json = """
+                    {"type":"item_drop","tick":0,"uuid":"u","item":"i",
+                     "loc":{"world":"w","x":1,"y":2,"z":3,"yaw":0,"pitch":0}}
+                    """;
+            TimelineEvent.ItemDrop event = (TimelineEvent.ItemDrop) gson.fromJson(json, TimelineEvent.class);
+            assertEquals(0.0, event.vx(), 0.001);
+            assertEquals(0.0, event.vy(), 0.001);
+            assertEquals(0.0, event.vz(), 0.001);
         }
 
         @Test
@@ -348,11 +390,47 @@ class TimelineEventAdapterTest {
     class EntitySpawnTests {
         @Test
         void roundtrip() {
-            var original = new TimelineEvent.EntitySpawn(18, "uuid-16", "SKELETON", "world", 100, 65, 200);
+            var original = new TimelineEvent.EntitySpawn(18, "uuid-16", "SKELETON", "world", 100, 65, 200, null);
             var restored = (TimelineEvent.EntitySpawn) TimelineEventAdapterTest.this.roundtrip(original);
 
             assertEquals(original.etype(), restored.etype());
             assertEquals(original.x(), restored.x(), 0.001);
+            assertNull(restored.blockData());
+        }
+
+        @Test
+        void roundtrip_preservesBlockDataForFallingBlock() {
+            var original = new TimelineEvent.EntitySpawn(
+                    18, "u", "FALLING_BLOCK", "world", 0, 0, 0,
+                    "minecraft:sand");
+            var restored = (TimelineEvent.EntitySpawn) TimelineEventAdapterTest.this.roundtrip(original);
+
+            assertEquals("minecraft:sand", restored.blockData());
+        }
+
+        @Test
+        void nullBlockData_omittedFromJson() {
+            var event = new TimelineEvent.EntitySpawn(0, "u", "ZOMBIE", "w", 0, 0, 0, null);
+            JsonObject json = toJson(event);
+            assertFalse(json.has("blockData"));
+        }
+
+        @Test
+        void blockData_writtenWhenPresent() {
+            var event = new TimelineEvent.EntitySpawn(
+                    0, "u", "FALLING_BLOCK", "w", 0, 0, 0,
+                    "minecraft:gravel");
+            JsonObject json = toJson(event);
+            assertEquals("minecraft:gravel", json.get("blockData").getAsString());
+        }
+
+        @Test
+        void deserialize_missingBlockData_defaultsToNull() {
+            String json = """
+                    {"type":"entity_spawn","tick":0,"uuid":"u","etype":"FALLING_BLOCK","world":"w","x":0,"y":0,"z":0}
+                    """;
+            TimelineEvent.EntitySpawn event = (TimelineEvent.EntitySpawn) gson.fromJson(json, TimelineEvent.class);
+            assertNull(event.blockData());
         }
 
         @Test

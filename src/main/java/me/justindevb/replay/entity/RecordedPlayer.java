@@ -6,9 +6,20 @@ import com.github.retrooper.packetevents.protocol.entity.data.EntityDataTypes;
 import com.github.retrooper.packetevents.protocol.entity.pose.EntityPose;
 import com.github.retrooper.packetevents.protocol.player.Equipment;
 import com.github.retrooper.packetevents.protocol.player.EquipmentSlot;
-import com.github.retrooper.packetevents.wrapper.play.server.*;
 import com.github.retrooper.packetevents.util.Vector3i;
+import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerBlockBreakAnimation;
+import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityAnimation;
+import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityEquipment;
+import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityHeadLook;
+import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityMetadata;
+import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityTeleport;
 import io.github.retrooper.packetevents.util.SpigotConversionUtil;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.Objects;
+import java.util.UUID;
 import me.justindevb.replay.Replay;
 import me.justindevb.replay.recording.TimelineEvent;
 import me.justindevb.replay.util.spawning.SpawnFakePlayer;
@@ -22,31 +33,25 @@ import org.bukkit.entity.Pose;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
-import java.util.*;
 
 import static me.justindevb.replay.util.io.ItemStackSerializer.deserializeItem;
 
 public class RecordedPlayer extends RecordedEntity {
     private final String name;
+    private final UUID uuid;
+    private final ItemStack[] lastArmor = new ItemStack[]{
+        new ItemStack(Material.AIR),
+        new ItemStack(Material.AIR),
+        new ItemStack(Material.AIR),
+        new ItemStack(Material.AIR)
+    };
     private boolean sneaking = false;
     private boolean sprinting = false;
-
     private byte metadataFlags = 0x00;
-
     private boolean spawned = false;
-    private final UUID uuid;
     private UUID fakeProfileUuid;
-
     private ItemStack lastMainHand = null;
     private ItemStack lastOffHand = null;
-    private final ItemStack[] lastArmor = new ItemStack[] {
-            new ItemStack(Material.AIR),
-            new ItemStack(Material.AIR),
-            new ItemStack(Material.AIR),
-            new ItemStack(Material.AIR)
-    };
-
-
     private TimelineEvent.InventoryUpdate currentInventory;
 
 
@@ -84,8 +89,8 @@ public class RecordedPlayer extends RecordedEntity {
     public void setPose(Pose pose) {
         EntityData<EntityPose> poseData = new EntityData<>(6, EntityDataTypes.ENTITY_POSE, EntityPose.valueOf(pose.name()));
         WrapperPlayServerEntityMetadata metadata = new WrapperPlayServerEntityMetadata(
-                fakeEntityId,
-                Collections.singletonList(poseData)
+            fakeEntityId,
+            Collections.singletonList(poseData)
         );
 
         PacketEvents.getAPI().getPlayerManager().sendPacket(viewer, metadata);
@@ -94,9 +99,9 @@ public class RecordedPlayer extends RecordedEntity {
     @Override
     public void moveTo(Location loc) {
         WrapperPlayServerEntityTeleport tp = new WrapperPlayServerEntityTeleport(
-                fakeEntityId,
-                SpigotConversionUtil.fromBukkitLocation(loc),
-                true
+            fakeEntityId,
+            SpigotConversionUtil.fromBukkitLocation(loc),
+            true
         );
         PacketEvents.getAPI().getPlayerManager().sendPacket(viewer, tp);
 
@@ -148,19 +153,18 @@ public class RecordedPlayer extends RecordedEntity {
         if (!changed) return;
 
         packets.add(new Equipment(
-                EquipmentSlot.MAIN_HAND,
-                SpigotConversionUtil.fromBukkitItemStack(lastMainHand)
+            EquipmentSlot.MAIN_HAND,
+            SpigotConversionUtil.fromBukkitItemStack(lastMainHand)
         ));
         packets.add(new Equipment(
-                EquipmentSlot.OFF_HAND,
-                SpigotConversionUtil.fromBukkitItemStack(lastOffHand)
+            EquipmentSlot.OFF_HAND,
+            SpigotConversionUtil.fromBukkitItemStack(lastOffHand)
         ));
 
         WrapperPlayServerEntityEquipment packet =
-                new WrapperPlayServerEntityEquipment(fakeEntityId, packets);
+            new WrapperPlayServerEntityEquipment(fakeEntityId, packets);
         PacketEvents.getAPI().getPlayerManager().sendPacket(viewer, packet);
     }
-
 
 
     // ---------------------
@@ -181,8 +185,8 @@ public class RecordedPlayer extends RecordedEntity {
         EntityData<EntityPose> poseData = new EntityData<>(6, EntityDataTypes.ENTITY_POSE, sneaking ? EntityPose.CROUCHING : EntityPose.STANDING);
 
         WrapperPlayServerEntityMetadata metadata = new WrapperPlayServerEntityMetadata(
-                fakeEntityId,
-                Arrays.asList(flagsData, poseData)
+            fakeEntityId,
+            Arrays.asList(flagsData, poseData)
         );
 
         PacketEvents.getAPI().getPlayerManager().sendPacket(viewer, metadata);
@@ -200,7 +204,7 @@ public class RecordedPlayer extends RecordedEntity {
 
         EntityData<Byte> flagsData = new EntityData<>(0, EntityDataTypes.BYTE, metadataFlags);
         WrapperPlayServerEntityMetadata metadata =
-                new WrapperPlayServerEntityMetadata(fakeEntityId, Collections.singletonList(flagsData));
+            new WrapperPlayServerEntityMetadata(fakeEntityId, Collections.singletonList(flagsData));
 
         PacketEvents.getAPI().getPlayerManager().sendPacket(viewer, metadata);
     }
@@ -217,7 +221,7 @@ public class RecordedPlayer extends RecordedEntity {
 
     public void showBlockBreak(int x, int y, int z, int stage) {
         WrapperPlayServerBlockBreakAnimation breakAnim =
-                new WrapperPlayServerBlockBreakAnimation(fakeEntityId, new Vector3i(x, y, z), (byte) stage);
+            new WrapperPlayServerBlockBreakAnimation(fakeEntityId, new Vector3i(x, y, z), (byte) stage);
 
         PacketEvents.getAPI().getPlayerManager().sendPacket(viewer, breakAnim);
     }
@@ -231,10 +235,11 @@ public class RecordedPlayer extends RecordedEntity {
         }
 
         WrapperPlayServerEntityAnimation swing =
-                new WrapperPlayServerEntityAnimation(fakeEntityId, anim);
+            new WrapperPlayServerEntityAnimation(fakeEntityId, anim);
         PacketEvents.getAPI().getPlayerManager().sendPacket(viewer, swing);
 
     }
+
     public void showInventorySnapshot(TimelineEvent.InventoryUpdate inv) {
         boolean changed = false;
         List<Equipment> packets = new ArrayList<>();
@@ -252,10 +257,10 @@ public class RecordedPlayer extends RecordedEntity {
         }
 
         EquipmentSlot[] armorSlots = {
-                EquipmentSlot.BOOTS,
-                EquipmentSlot.LEGGINGS,
-                EquipmentSlot.CHEST_PLATE,
-                EquipmentSlot.HELMET
+            EquipmentSlot.BOOTS,
+            EquipmentSlot.LEGGINGS,
+            EquipmentSlot.CHEST_PLATE,
+            EquipmentSlot.HELMET
         };
 
         List<String> rawArmorList = inv.armor();
@@ -274,24 +279,24 @@ public class RecordedPlayer extends RecordedEntity {
         if (!changed) return;
 
         packets.add(new Equipment(
-                EquipmentSlot.MAIN_HAND,
-                SpigotConversionUtil.fromBukkitItemStack(lastMainHand)
+            EquipmentSlot.MAIN_HAND,
+            SpigotConversionUtil.fromBukkitItemStack(lastMainHand)
         ));
 
         packets.add(new Equipment(
-                EquipmentSlot.OFF_HAND,
-                SpigotConversionUtil.fromBukkitItemStack(lastOffHand)
+            EquipmentSlot.OFF_HAND,
+            SpigotConversionUtil.fromBukkitItemStack(lastOffHand)
         ));
 
         for (int i = 0; i < armorSlots.length; i++) {
             packets.add(new Equipment(
-                    armorSlots[i],
-                    SpigotConversionUtil.fromBukkitItemStack(lastArmor[i])
+                armorSlots[i],
+                SpigotConversionUtil.fromBukkitItemStack(lastArmor[i])
             ));
         }
 
         WrapperPlayServerEntityEquipment packet =
-                new WrapperPlayServerEntityEquipment(fakeEntityId, packets);
+            new WrapperPlayServerEntityEquipment(fakeEntityId, packets);
 
         PacketEvents.getAPI().getPlayerManager().sendPacket(viewer, packet);
     }
@@ -318,9 +323,7 @@ public class RecordedPlayer extends RecordedEntity {
         if (metaA == null || metaB == null) return false;
 
         if (!Objects.equals(metaA.displayName(), metaB.displayName())) return false;
-        if (!Objects.equals(metaA.lore(), metaB.lore())) return false;
-
-        return true;
+        return Objects.equals(metaA.lore(), metaB.lore());
     }
 
     public void openInventoryForViewer(Player viewer) {
@@ -346,7 +349,7 @@ public class RecordedPlayer extends RecordedEntity {
         }
 
         Replay.getInstance().getFoliaLib().getScheduler().runNextTick(task -> {
-           viewer.openInventory(inv);
+            viewer.openInventory(inv);
         });
     }
 

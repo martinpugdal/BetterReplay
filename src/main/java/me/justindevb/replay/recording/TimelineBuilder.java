@@ -1,9 +1,8 @@
 package me.justindevb.replay.recording;
 
-import org.bukkit.inventory.ItemStack;
-
 import java.util.ArrayList;
 import java.util.List;
+import org.bukkit.inventory.ItemStack;
 
 import static me.justindevb.replay.util.io.ItemStackSerializer.serializeItem;
 
@@ -39,10 +38,10 @@ public class TimelineBuilder {
         }
 
         return new TimelineEvent.InventoryUpdate(
-                tick, uuid,
-                serializeItem(p.getInventory().getItemInMainHand()),
-                serializeItem(p.getInventory().getItemInOffHand()),
-                armor, contents
+            tick, uuid,
+            serializeItem(p.getInventory().getItemInMainHand()),
+            serializeItem(p.getInventory().getItemInOffHand()),
+            armor, contents
         );
     }
 }

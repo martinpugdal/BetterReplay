@@ -4,14 +4,13 @@ import com.github.retrooper.packetevents.PacketEvents;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityHeadLook;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityTeleport;
 import io.github.retrooper.packetevents.util.SpigotConversionUtil;
+import java.util.UUID;
 import me.justindevb.replay.Replay;
-import me.justindevb.replay.util.EntityTypeMapper;
+import me.justindevb.replay.util.entity.EntityTypeMapper;
 import me.justindevb.replay.util.spawning.SpawnFakeMob;
 import org.bukkit.Location;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
-
-import java.util.UUID;
 
 public class RecordedMob extends RecordedEntity {
 
@@ -36,9 +35,9 @@ public class RecordedMob extends RecordedEntity {
     @Override
     public void moveTo(Location loc) {
         WrapperPlayServerEntityTeleport tp = new WrapperPlayServerEntityTeleport(
-                fakeEntityId,
-                SpigotConversionUtil.fromBukkitLocation(loc),
-                true
+            fakeEntityId,
+            SpigotConversionUtil.fromBukkitLocation(loc),
+            true
         );
         PacketEvents.getAPI().getPlayerManager().sendPacket(viewer, tp);
 

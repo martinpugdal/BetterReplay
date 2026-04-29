@@ -15,71 +15,101 @@ import java.util.List;
  */
 public sealed interface TimelineEvent {
 
-    /** Game tick when this event was recorded. */
+    /**
+     * Sentinel actor identifier for events synthesized by the plugin from non-player
+     * sources (e.g. explosions, liquid flow, leaves decay). Stored in place of a UUID
+     * so playback can distinguish system events from player events.
+     */
+    String SYSTEM_ACTOR = "system";
+
+    /**
+     * Game tick when this event was recorded.
+     */
     int tick();
 
-    /** UUID of the entity associated with this event, or {@code null} for events like block_break_stage where the actor may be unknown. */
+    /**
+     * UUID of the entity associated with this event, or {@code null} for events like block_break_stage where the actor may be unknown.
+     */
     String uuid();
 
     // ── Movement ──────────────────────────────────────────────
 
     record PlayerMove(int tick, String uuid, String name, String world,
                       double x, double y, double z, float yaw, float pitch,
-                      String pose) implements TimelineEvent {}
+                      String pose) implements TimelineEvent {
+    }
 
     record EntityMove(int tick, String uuid, String etype, String world,
-                      double x, double y, double z, float yaw, float pitch) implements TimelineEvent {}
+                      double x, double y, double z, float yaw, float pitch) implements TimelineEvent {
+    }
 
     // ── Inventory ─────────────────────────────────────────────
 
     record InventoryUpdate(int tick, String uuid, String mainHand, String offHand,
-                           List<String> armor, List<String> contents) implements TimelineEvent {}
+                           List<String> armor, List<String> contents) implements TimelineEvent {
+    }
 
-    record HeldItemChange(int tick, String uuid, String mainHand, String offHand) implements TimelineEvent {}
+    record HeldItemChange(int tick, String uuid, String mainHand, String offHand) implements TimelineEvent {
+    }
 
     // ── Blocks ────────────────────────────────────────────────
 
     record BlockBreak(int tick, String uuid, String world, int x, int y, int z,
-                      String blockData) implements TimelineEvent {}
+                      String blockData) implements TimelineEvent {
+    }
 
     record BlockBreakComplete(int tick, String uuid, String world,
-                              int x, int y, int z) implements TimelineEvent {}
+                              int x, int y, int z) implements TimelineEvent {
+    }
 
     record BlockBreakStage(int tick, String uuid, String world,
-                           int x, int y, int z, int stage) implements TimelineEvent {}
+                           int x, int y, int z, int stage) implements TimelineEvent {
+    }
 
     record BlockPlace(int tick, String uuid, String world, int x, int y, int z,
-                      String blockData, String replacedBlockData) implements TimelineEvent {}
+                      String blockData, String replacedBlockData) implements TimelineEvent {
+    }
 
     // ── Items ─────────────────────────────────────────────────
 
     record ItemDrop(int tick, String uuid, String item,
                     String locWorld, double locX, double locY, double locZ,
-                    float locYaw, float locPitch) implements TimelineEvent {}
+                    float locYaw, float locPitch,
+                    double vx, double vy, double vz) implements TimelineEvent {
+    }
 
     // ── Combat / Interaction ──────────────────────────────────
 
     record Attack(int tick, String uuid, String targetUuid,
-                  String entityUuid, String entityType) implements TimelineEvent {}
+                  String entityUuid, String entityType) implements TimelineEvent {
+    }
 
-    record Swing(int tick, String uuid, String hand) implements TimelineEvent {}
+    record Swing(int tick, String uuid, String hand) implements TimelineEvent {
+    }
 
     record Damaged(int tick, String uuid, String entityType, String cause,
-                   double finalDamage) implements TimelineEvent {}
+                   double finalDamage) implements TimelineEvent {
+    }
 
     // ── State toggles ─────────────────────────────────────────
 
-    record SprintToggle(int tick, String uuid, boolean sprinting) implements TimelineEvent {}
+    record SprintToggle(int tick, String uuid, boolean sprinting) implements TimelineEvent {
+    }
 
-    record SneakToggle(int tick, String uuid, boolean sneaking) implements TimelineEvent {}
+    record SneakToggle(int tick, String uuid, boolean sneaking) implements TimelineEvent {
+    }
 
     // ── Lifecycle ─────────────────────────────────────────────
 
     record EntitySpawn(int tick, String uuid, String etype, String world,
-                       double x, double y, double z) implements TimelineEvent {}
+                       double x, double y, double z,
+                       String blockData) implements TimelineEvent {
+    }
 
     record EntityDeath(int tick, String uuid, String etype, String world,
-                       double x, double y, double z) implements TimelineEvent {}
+                       double x, double y, double z) implements TimelineEvent {
+    }
 
-    record PlayerQuit(int tick, String uuid) implements TimelineEvent {}
+    record PlayerQuit(int tick, String uuid) implements TimelineEvent {
+    }
 }

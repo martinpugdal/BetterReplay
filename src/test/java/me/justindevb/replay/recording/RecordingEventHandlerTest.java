@@ -1,5 +1,8 @@
 package me.justindevb.replay.recording;
 
+import java.util.HashSet;
+import java.util.Set;
+import java.util.UUID;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.block.Block;
@@ -14,12 +17,18 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockDamageEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
+import org.bukkit.event.entity.EntityChangeBlockEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.event.entity.EntitySpawnEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
-import org.bukkit.event.player.*;
+import org.bukkit.event.player.PlayerAnimationEvent;
+import org.bukkit.event.player.PlayerAnimationType;
+import org.bukkit.event.player.PlayerDropItemEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.event.player.PlayerToggleSneakEvent;
+import org.bukkit.event.player.PlayerToggleSprintEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
 import org.junit.jupiter.api.BeforeEach;
@@ -30,10 +39,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
-
-import java.util.HashSet;
-import java.util.Set;
-import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -163,19 +168,27 @@ class RecordingEventHandlerTest {
 
         World world = mock(World.class);
         when(world.getName()).thenReturn("world");
-        Location loc = new Location(world, 1, 2, 3, 45f, 30f);
-        when(p.getLocation()).thenReturn(loc);
+        Location itemLoc = new Location(world, 1.5, 2.0, 3.5, 45f, 30f);
 
         Item itemEntity = mock(Item.class);
         ItemStack stack = mock(ItemStack.class);
         when(stack.isEmpty()).thenReturn(true);
         when(itemEntity.getItemStack()).thenReturn(stack);
+        when(itemEntity.getLocation()).thenReturn(itemLoc);
+        when(itemEntity.getVelocity()).thenReturn(new org.bukkit.util.Vector(0.1, 0.2, 0.3));
 
         PlayerDropItemEvent event = new PlayerDropItemEvent(p, itemEntity);
         handler.onItemDrop(event);
 
         assertEquals(1, builder.getTimeline().size());
-        assertInstanceOf(TimelineEvent.ItemDrop.class, builder.getTimeline().get(0));
+        TimelineEvent.ItemDrop drop = (TimelineEvent.ItemDrop) builder.getTimeline().get(0);
+        assertEquals("world", drop.locWorld());
+        assertEquals(1.5, drop.locX(), 0.001);
+        assertEquals(2.0, drop.locY(), 0.001);
+        assertEquals(3.5, drop.locZ(), 0.001);
+        assertEquals(0.1, drop.vx(), 0.001);
+        assertEquals(0.2, drop.vy(), 0.001);
+        assertEquals(0.3, drop.vz(), 0.001);
     }
 
     // ── Attack ────────────────────────────────────────────────
@@ -532,6 +545,147 @@ class RecordingEventHandlerTest {
         handler.onEntitySpawn(event);
 
         assertTrue(builder.getTimeline().isEmpty());
+    }
+
+    @Test
+    void onEntitySpawn_fallingBlock_capturesBlockData() {
+        UUID entityUuid = UUID.randomUUID();
+        org.bukkit.entity.FallingBlock fb = mock(org.bukkit.entity.FallingBlock.class);
+        when(fb.getUniqueId()).thenReturn(entityUuid);
+        when(fb.getType()).thenReturn(EntityType.FALLING_BLOCK);
+        World world = mock(World.class);
+        when(world.getName()).thenReturn("world");
+        Location loc = new Location(world, 5, 70, 5);
+        when(fb.getLocation()).thenReturn(loc);
+
+        BlockData fallingBlockData = mock(BlockData.class);
+        when(fallingBlockData.getAsString()).thenReturn("minecraft:sand");
+        when(fb.getBlockData()).thenReturn(fallingBlockData);
+
+        when(tracker.isNearbyTrackedPlayer(loc)).thenReturn(true);
+        when(tracker.isEntityTracked(entityUuid)).thenReturn(false);
+
+        EntitySpawnEvent event = mock(EntitySpawnEvent.class);
+        when(event.getEntity()).thenReturn(fb);
+        when(event.getEntityType()).thenReturn(EntityType.FALLING_BLOCK);
+        when(event.getLocation()).thenReturn(loc);
+
+        handler.onEntitySpawn(event);
+
+        assertEquals(1, builder.getTimeline().size());
+        TimelineEvent.EntitySpawn spawn = (TimelineEvent.EntitySpawn) builder.getTimeline().get(0);
+        assertEquals("FALLING_BLOCK", spawn.etype());
+        assertEquals("minecraft:sand", spawn.blockData());
+    }
+
+    // ── onFallingBlockChange ─────────────────────────────────
+
+    @Test
+    void onFallingBlockChange_spawnTransition_recordsSystemBlockBreak() {
+        UUID entityUuid = UUID.randomUUID();
+        org.bukkit.entity.FallingBlock fb = mock(org.bukkit.entity.FallingBlock.class);
+        when(fb.getUniqueId()).thenReturn(entityUuid);
+        when(tracker.isEntityTracked(entityUuid)).thenReturn(true);
+
+        Block sourceBlock = mockBlock("world", 5, 70, 5, "minecraft:sand");
+
+        EntityChangeBlockEvent event = mock(EntityChangeBlockEvent.class);
+        when(event.getEntity()).thenReturn(fb);
+        when(event.getBlock()).thenReturn(sourceBlock);
+        when(event.getTo()).thenReturn(org.bukkit.Material.AIR);
+
+        handler.onFallingBlockChange(event);
+
+        assertEquals(1, builder.getTimeline().size());
+        TimelineEvent.BlockBreak bb = (TimelineEvent.BlockBreak) builder.getTimeline().get(0);
+        assertEquals(TimelineEvent.SYSTEM_ACTOR, bb.uuid());
+        assertEquals(5, bb.x());
+        assertEquals(70, bb.y());
+        assertEquals(5, bb.z());
+        assertEquals("minecraft:sand", bb.blockData());
+        verify(tracker, never()).removeEntity(any());
+    }
+
+    @Test
+    void onFallingBlockChange_landingTransition_recordsDeathAndPlaceAndUntracksEntity() {
+        UUID entityUuid = UUID.randomUUID();
+        org.bukkit.entity.FallingBlock fb = mock(org.bukkit.entity.FallingBlock.class);
+        when(fb.getUniqueId()).thenReturn(entityUuid);
+        when(fb.getType()).thenReturn(EntityType.FALLING_BLOCK);
+        when(tracker.isEntityTracked(entityUuid)).thenReturn(true);
+
+        Block landingBlock = mockBlock("world", 5, 64, 5, "minecraft:air");
+        BlockData newData = mock(BlockData.class);
+        when(newData.getAsString()).thenReturn("minecraft:sand");
+
+        EntityChangeBlockEvent event = mock(EntityChangeBlockEvent.class);
+        when(event.getEntity()).thenReturn(fb);
+        when(event.getBlock()).thenReturn(landingBlock);
+        when(event.getTo()).thenReturn(org.bukkit.Material.SAND);
+        when(event.getBlockData()).thenReturn(newData);
+
+        handler.onFallingBlockChange(event);
+
+        assertEquals(2, builder.getTimeline().size());
+
+        TimelineEvent.EntityDeath death = (TimelineEvent.EntityDeath) builder.getTimeline().get(0);
+        assertEquals(entityUuid.toString(), death.uuid());
+        assertEquals("FALLING_BLOCK", death.etype());
+        assertEquals(5, death.x());
+        assertEquals(64, death.y());
+        assertEquals(5, death.z());
+
+        TimelineEvent.BlockPlace place = (TimelineEvent.BlockPlace) builder.getTimeline().get(1);
+        assertEquals(TimelineEvent.SYSTEM_ACTOR, place.uuid());
+        assertEquals("minecraft:sand", place.blockData());
+        assertEquals("minecraft:air", place.replacedBlockData());
+
+        verify(tracker).removeEntity(entityUuid);
+    }
+
+    @Test
+    void onFallingBlockChange_untrackedEntity_ignored() {
+        UUID entityUuid = UUID.randomUUID();
+        org.bukkit.entity.FallingBlock fb = mock(org.bukkit.entity.FallingBlock.class);
+        when(fb.getUniqueId()).thenReturn(entityUuid);
+        when(tracker.isEntityTracked(entityUuid)).thenReturn(false);
+
+        EntityChangeBlockEvent event = mock(EntityChangeBlockEvent.class);
+        when(event.getEntity()).thenReturn(fb);
+
+        handler.onFallingBlockChange(event);
+
+        assertTrue(builder.getTimeline().isEmpty());
+        verify(tracker, never()).removeEntity(any());
+    }
+
+    @Test
+    void onFallingBlockChange_nonFallingBlockEntity_ignored() {
+        Entity zombie = mock(Entity.class);
+        EntityChangeBlockEvent event = mock(EntityChangeBlockEvent.class);
+        when(event.getEntity()).thenReturn(zombie);
+
+        handler.onFallingBlockChange(event);
+
+        assertTrue(builder.getTimeline().isEmpty());
+    }
+
+    @Test
+    void onEntityChangeBlock_fallingBlock_skipsToAvoidDoubleRecording() {
+        // The unconditional onFallingBlockChange handles FallingBlocks; the snapshotBounds
+        // handler must skip them so we don't record duplicate BlockPlace events.
+        RecordingEventHandler boundedHandler = new RecordingEventHandler(
+                tracker, builder, () -> tick, uuid -> {}, loc -> true);
+
+        org.bukkit.entity.FallingBlock fb = mock(org.bukkit.entity.FallingBlock.class);
+
+        EntityChangeBlockEvent event = mock(EntityChangeBlockEvent.class);
+        when(event.getEntity()).thenReturn(fb);
+
+        boundedHandler.onEntityChangeBlock(event);
+
+        assertTrue(builder.getTimeline().isEmpty(),
+                "FallingBlock should be handled by onFallingBlockChange only");
     }
 
     @Test

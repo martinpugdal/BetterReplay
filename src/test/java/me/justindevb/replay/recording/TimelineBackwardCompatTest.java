@@ -3,12 +3,11 @@ package me.justindevb.replay.recording;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
-import me.justindevb.replay.util.VersionUtil;
-import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.Test;
-
 import java.lang.reflect.Type;
 import java.util.List;
+import me.justindevb.replay.util.version.VersionUtil;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -199,13 +198,13 @@ class TimelineBackwardCompatTest {
                 new TimelineEvent.BlockBreakComplete(4, "u1", "world", 10, 64, 20),
                 new TimelineEvent.BlockBreakStage(5, null, "world", 10, 64, 20, 3),
                 new TimelineEvent.BlockPlace(6, "u1", "world", 10, 64, 20, "minecraft:cobblestone", "minecraft:air"),
-                new TimelineEvent.ItemDrop(7, "u1", "item", "world", 1, 2, 3, 0, 0),
+                new TimelineEvent.ItemDrop(7, "u1", "item", "world", 1, 2, 3, 0, 0, 0, 0, 0),
                 new TimelineEvent.Attack(8, "u1", "u2", "u2", "ZOMBIE"),
                 new TimelineEvent.Swing(9, "u1", "ARM_SWING"),
                 new TimelineEvent.Damaged(10, "u1", "PLAYER", "FALL", 5.5),
                 new TimelineEvent.SprintToggle(11, "u1", true),
                 new TimelineEvent.SneakToggle(12, "u1", false),
-                new TimelineEvent.EntitySpawn(13, "u3", "SKELETON", "world", 50, 65, 80),
+                new TimelineEvent.EntitySpawn(13, "u3", "SKELETON", "world", 50, 65, 80, null),
                 new TimelineEvent.EntityDeath(14, "u3", "SKELETON", "world", 50, 65, 80),
                 new TimelineEvent.PlayerQuit(15, "u1")
         );

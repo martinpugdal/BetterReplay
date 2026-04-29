@@ -5,11 +5,10 @@ import com.github.retrooper.packetevents.event.PacketSendEvent;
 import com.github.retrooper.packetevents.protocol.packettype.PacketType;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerBlockBreakAnimation;
 import io.github.retrooper.packetevents.util.SpigotConversionUtil;
-import org.bukkit.entity.Entity;
-import org.bukkit.entity.Player;
-
 import java.util.HashMap;
 import java.util.Map;
+import org.bukkit.entity.Entity;
+import org.bukkit.entity.Player;
 
 /**
  * Handles PacketEvents packet interception during a recording session.
@@ -21,8 +20,6 @@ public class RecordingPacketHandler implements PacketListener {
     private final TimelineBuilder builder;
     private final RecordingEventHandler.TickProvider tickProvider;
     private final Map<DedupKey, Integer> breakStageDedup = new HashMap<>();
-
-    private record DedupKey(String world, int x, int y, int z, int stage) {}
 
     public RecordingPacketHandler(EntityTracker tracker, TimelineBuilder builder, RecordingEventHandler.TickProvider tickProvider) {
         this.tracker = tracker;
@@ -66,8 +63,11 @@ public class RecordingPacketHandler implements PacketListener {
             }
 
             builder.addEvent(new TimelineEvent.BlockBreakStage(
-                    tick, breakerUuid, world, x, y, z, stage
+                tick, breakerUuid, world, x, y, z, stage
             ));
         }
+    }
+
+    private record DedupKey(String world, int x, int y, int z, int stage) {
     }
 }
