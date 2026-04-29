@@ -2,32 +2,30 @@ package me.justindevb.replay.storage;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import com.google.gson.reflect.TypeToken;
-import me.justindevb.replay.Replay;
-import me.justindevb.replay.recording.TimelineEvent;
-import me.justindevb.replay.recording.TimelineEventAdapter;
-import me.justindevb.replay.util.io.ReplayCompressor;
-import me.justindevb.replay.util.VersionUtil;
-
-import java.io.*;
-import java.lang.reflect.Type;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import me.justindevb.replay.Replay;
+import me.justindevb.replay.recording.TimelineEvent;
+import me.justindevb.replay.recording.TimelineEventAdapter;
+import me.justindevb.replay.util.io.ReplayCompressor;
+import me.justindevb.replay.util.version.VersionUtil;
 
 public class FileReplayStorage implements ReplayStorage {
 
-    private static final String EXT_COMPRESSED   = ".json.gz";
+    private static final String EXT_COMPRESSED = ".json.gz";
     private static final String EXT_UNCOMPRESSED = ".json";
 
     private final File replayFolder;
     private final Replay replay;
-    private static final Type TIMELINE_LIST_TYPE = new TypeToken<List<TimelineEvent>>() {}.getType();
     private final Gson gson = new GsonBuilder()
-            .setPrettyPrinting()
-            .registerTypeHierarchyAdapter(TimelineEvent.class, new TimelineEventAdapter())
-            .create();
+        .setPrettyPrinting()
+        .registerTypeHierarchyAdapter(TimelineEvent.class, new TimelineEventAdapter())
+        .create();
 
     public FileReplayStorage(Replay replay) {
         this.replay = replay;
@@ -36,7 +34,9 @@ public class FileReplayStorage implements ReplayStorage {
             replayFolder.mkdirs();
     }
 
-    /** Returns true when the plugin config has compression enabled (default: true). */
+    /**
+     * Returns true when the plugin config has compression enabled (default: true).
+     */
     private boolean isCompressionEnabled() {
         return replay.getConfig().getBoolean("General.Compress-Replays", true);
     }
@@ -56,9 +56,14 @@ public class FileReplayStorage implements ReplayStorage {
 
     @Override
     public CompletableFuture<Void> saveReplay(String name, List<TimelineEvent> timeline) {
+        return saveReplay(name, new ReplayData(timeline, null));
+    }
+
+    @Override
+    public CompletableFuture<Void> saveReplay(String name, ReplayData data) {
         return CompletableFuture.runAsync(() -> {
             try {
-                String json = VersionUtil.wrapTimeline(gson, timeline, replay.getPluginMeta().getVersion());
+                String json = VersionUtil.wrapReplayData(gson, data, replay.getPluginMeta().getVersion());
                 if (isCompressionEnabled()) {
                     File file = new File(replayFolder, name + EXT_COMPRESSED);
                     Files.write(file.toPath(), ReplayCompressor.compress(json));
@@ -82,6 +87,11 @@ public class FileReplayStorage implements ReplayStorage {
 
     @Override
     public CompletableFuture<List<TimelineEvent>> loadReplay(String name) {
+        return loadReplayData(name).thenApply(d -> d != null ? d.timeline() : null);
+    }
+
+    @Override
+    public CompletableFuture<ReplayData> loadReplayData(String name) {
         return CompletableFuture.supplyAsync(() -> {
             File file = resolveExisting(name);
             if (file == null) return null;
@@ -90,7 +100,7 @@ public class FileReplayStorage implements ReplayStorage {
                 byte[] bytes = Files.readAllBytes(file.toPath());
                 // Auto-detect: works for both compressed and plain-text files
                 String json = ReplayCompressor.decompressIfNeeded(bytes);
-                return VersionUtil.parseReplayJson(gson, json, replay.getPluginMeta().getVersion(), TIMELINE_LIST_TYPE);
+                return VersionUtil.parseReplayData(gson, json, replay.getPluginMeta().getVersion());
             } catch (IOException e) {
                 throw new RuntimeException("Failed to load replay " + name, e);
             }
@@ -109,7 +119,7 @@ public class FileReplayStorage implements ReplayStorage {
     public CompletableFuture<List<String>> listReplays() {
         return CompletableFuture.supplyAsync(() -> {
             File[] files = replayFolder.listFiles(
-                    (dir, n) -> n.endsWith(EXT_COMPRESSED) || n.endsWith(EXT_UNCOMPRESSED));
+                (dir, n) -> n.endsWith(EXT_COMPRESSED) || n.endsWith(EXT_UNCOMPRESSED));
             List<String> names = new ArrayList<>();
             if (files != null) {
                 for (File f : files) {

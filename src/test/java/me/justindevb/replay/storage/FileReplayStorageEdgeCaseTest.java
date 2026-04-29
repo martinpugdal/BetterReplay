@@ -1,19 +1,18 @@
 package me.justindevb.replay.storage;
 
-import me.justindevb.replay.Replay;
-import me.justindevb.replay.recording.TimelineEvent;
-import org.bukkit.configuration.file.FileConfiguration;
 import io.papermc.paper.plugin.configuration.PluginMeta;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
-
 import java.io.File;
 import java.io.FileWriter;
 import java.nio.file.Files;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
+import me.justindevb.replay.Replay;
+import me.justindevb.replay.recording.TimelineEvent;
+import org.bukkit.configuration.file.FileConfiguration;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;

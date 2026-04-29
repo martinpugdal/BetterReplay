@@ -1,16 +1,29 @@
 package me.justindevb.replay.util.version;
 
-import com.google.gson.*;
-
+import com.google.gson.Gson;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+import com.google.gson.reflect.TypeToken;
 import java.lang.reflect.Type;
 import java.util.List;
+import me.justindevb.replay.recording.TimelineEvent;
+import me.justindevb.replay.snapshot.WorldSnapshot;
+import me.justindevb.replay.snapshot.WorldSnapshotCodec;
+import me.justindevb.replay.storage.ReplayData;
 
 public final class VersionUtil {
 
-    /** Minimum plugin version required to read recordings produced by this build. */
+    /**
+     * Minimum plugin version required to read recordings produced by this build.
+     */
     public static final String MIN_RECORDING_VERSION = "1.4.0";
 
-    private VersionUtil() {}
+    private static final Type TIMELINE_LIST_TYPE = new TypeToken<List<TimelineEvent>>() {
+    }.getType();
+
+    private VersionUtil() {
+    }
 
     /**
      * Returns true if {@code running} is greater than or equal to {@code required}.
@@ -42,27 +55,57 @@ public final class VersionUtil {
 
     /**
      * Wraps a timeline list in an envelope JSON object with version metadata.
+     * Convenience overload that records no world snapshot — equivalent to
+     * {@link #wrapReplayData(Gson, ReplayData, String)} with a null snapshot.
      */
     public static String wrapTimeline(Gson gson, List<?> timeline, String pluginVersion) {
+        @SuppressWarnings("unchecked")
+        List<TimelineEvent> typed = (List<TimelineEvent>) timeline;
+        return wrapReplayData(gson, new ReplayData(typed, null), pluginVersion);
+    }
+
+    /**
+     * Parses replay JSON into a timeline list, discarding any embedded world snapshot.
+     * Convenience overload retained for compatibility with callers that pre-date
+     * snapshot support. The {@code listType} parameter is accepted for signature
+     * compatibility with the previous version of this method but is not used
+     * internally; the timeline type is always {@code List<TimelineEvent>}.
+     */
+    @SuppressWarnings("unchecked")
+    public static <T> List<T> parseReplayJson(Gson gson, String json, String runningVersion,
+                                              @SuppressWarnings("unused") Type listType) {
+        return (List<T>) parseReplayData(gson, json, runningVersion).timeline();
+    }
+
+    /**
+     * Wraps a replay payload (timeline + optional world snapshot) in an envelope JSON
+     * object with version metadata.
+     */
+    public static String wrapReplayData(Gson gson, ReplayData data, String pluginVersion) {
         JsonObject envelope = new JsonObject();
         envelope.addProperty("createdBy", pluginVersion);
         envelope.addProperty("minVersion", MIN_RECORDING_VERSION);
-        envelope.add("timeline", gson.toJsonTree(timeline));
+        envelope.add("timeline", gson.toJsonTree(data.timeline()));
+        if (data.worldSnapshot() != null && !data.worldSnapshot().isEmpty()) {
+            envelope.add("worldSnapshot", WorldSnapshotCodec.toJson(data.worldSnapshot()));
+        }
         return gson.toJson(envelope);
     }
 
     /**
-     * Parses replay JSON, handling both legacy (raw array) and new (envelope) formats.
-     * Checks version compatibility when an envelope is present.
+     * Parses replay JSON, handling legacy (raw array), envelope (timeline only), and
+     * envelope + worldSnapshot formats. Checks version compatibility when an envelope
+     * is present.
      *
      * @throws ReplayVersionMismatchException if the recording requires a newer plugin version
      */
-    public static <T> List<T> parseReplayJson(Gson gson, String json, String runningVersion, Type listType) {
+    public static ReplayData parseReplayData(Gson gson, String json, String runningVersion) {
         JsonElement el = JsonParser.parseString(json);
 
         if (el.isJsonArray()) {
             // Legacy format: raw timeline array, no version check possible
-            return gson.fromJson(el, listType);
+            List<TimelineEvent> timeline = gson.fromJson(el, TIMELINE_LIST_TYPE);
+            return new ReplayData(timeline, null);
         }
 
         JsonObject obj = el.getAsJsonObject();
@@ -72,7 +115,14 @@ public final class VersionUtil {
                 throw new ReplayVersionMismatchException(required, runningVersion);
             }
         }
-        return gson.fromJson(obj.get("timeline"), listType);
+
+        List<TimelineEvent> timeline = gson.fromJson(obj.get("timeline"), TIMELINE_LIST_TYPE);
+
+        WorldSnapshot snapshot = null;
+        if (obj.has("worldSnapshot")) {
+            snapshot = WorldSnapshotCodec.fromJson(obj.get("worldSnapshot"));
+        }
+        return new ReplayData(timeline, snapshot);
     }
 
     /**
@@ -88,7 +138,13 @@ public final class VersionUtil {
             this.runningVersion = runningVersion;
         }
 
-        public String getRequiredVersion() { return requiredVersion; }
-        public String getRunningVersion() { return runningVersion; }
+        public String getRequiredVersion() {
+            return requiredVersion;
+        }
+
+        public String getRunningVersion() {
+            return runningVersion;
+        }
     }
 }
+

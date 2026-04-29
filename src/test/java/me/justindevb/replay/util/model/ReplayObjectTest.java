@@ -1,15 +1,15 @@
 package me.justindevb.replay.util.model;
 
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import me.justindevb.replay.recording.TimelineEvent;
+import me.justindevb.replay.storage.ReplayData;
 import me.justindevb.replay.storage.ReplayStorage;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-
-import java.util.List;
-import java.util.concurrent.CompletableFuture;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -60,18 +60,18 @@ class ReplayObjectTest {
     @Test
     void load_updatesTimeline() {
         List<TimelineEvent> loadedTimeline = List.of(new TimelineEvent.PlayerQuit(99, "loaded"));
-        when(storage.loadReplay("test-replay"))
-                .thenReturn(CompletableFuture.completedFuture(loadedTimeline));
+        when(storage.loadReplayData("test-replay"))
+                .thenReturn(CompletableFuture.completedFuture(new ReplayData(loadedTimeline, null)));
 
         replayObject.load().join();
 
         assertSame(loadedTimeline, replayObject.getTimeline());
-        verify(storage).loadReplay("test-replay");
+        verify(storage).loadReplayData("test-replay");
     }
 
     @Test
     void load_nullResult_keepsExistingTimeline() {
-        when(storage.loadReplay("test-replay"))
+        when(storage.loadReplayData("test-replay"))
                 .thenReturn(CompletableFuture.completedFuture(null));
 
         replayObject.load().join();

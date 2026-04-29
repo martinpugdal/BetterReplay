@@ -1,9 +1,14 @@
 package me.justindevb.replay.storage;
 
+import io.papermc.paper.plugin.configuration.PluginMeta;
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.util.List;
+import java.util.concurrent.ExecutionException;
 import me.justindevb.replay.Replay;
 import me.justindevb.replay.recording.TimelineEvent;
 import org.bukkit.configuration.file.FileConfiguration;
-import io.papermc.paper.plugin.configuration.PluginMeta;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -13,12 +18,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
-
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.util.List;
-import java.util.concurrent.ExecutionException;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;

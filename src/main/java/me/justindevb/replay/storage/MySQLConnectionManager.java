@@ -2,7 +2,6 @@ package me.justindevb.replay.storage;
 
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
-
 import javax.sql.DataSource;
 
 public class MySQLConnectionManager {

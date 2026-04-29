@@ -2,29 +2,30 @@ package me.justindevb.replay.storage;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import com.google.gson.reflect.TypeToken;
+import java.io.File;
+import java.io.FileWriter;
+import java.nio.charset.StandardCharsets;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import javax.sql.DataSource;
 import me.justindevb.replay.Replay;
 import me.justindevb.replay.recording.TimelineEvent;
 import me.justindevb.replay.recording.TimelineEventAdapter;
 import me.justindevb.replay.util.io.ReplayCompressor;
-import me.justindevb.replay.util.VersionUtil;
-
-import javax.sql.DataSource;
-import java.io.*;
-import java.lang.reflect.Type;
-import java.nio.charset.StandardCharsets;
-import java.sql.*;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.CompletableFuture;
+import me.justindevb.replay.util.version.VersionUtil;
 
 public class MySQLReplayStorage implements ReplayStorage {
 
     private final DataSource dataSource;
-    private static final Type TIMELINE_LIST_TYPE = new TypeToken<List<TimelineEvent>>() {}.getType();
     private final Gson gson = new GsonBuilder()
-            .registerTypeHierarchyAdapter(TimelineEvent.class, new TimelineEventAdapter())
-            .create();
+        .registerTypeHierarchyAdapter(TimelineEvent.class, new TimelineEventAdapter())
+        .create();
     private final Replay replay;
 
     public MySQLReplayStorage(DataSource dataSource, Replay replay) {
@@ -33,7 +34,9 @@ public class MySQLReplayStorage implements ReplayStorage {
         init();
     }
 
-    /** Returns true when the plugin config has compression enabled (default: true). */
+    /**
+     * Returns true when the plugin config has compression enabled (default: true).
+     */
     private boolean isCompressionEnabled() {
         return replay.getConfig().getBoolean("General.Compress-Replays", true);
     }
@@ -44,12 +47,12 @@ public class MySQLReplayStorage implements ReplayStorage {
                  Statement stmt = conn.createStatement()) {
 
                 stmt.executeUpdate("""
-                    CREATE TABLE IF NOT EXISTS replays (
-                        name VARCHAR(64) PRIMARY KEY,
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        data MEDIUMBLOB NOT NULL
-                    )
-                """);
+                        CREATE TABLE IF NOT EXISTS replays (
+                            name VARCHAR(64) PRIMARY KEY,
+                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            data MEDIUMBLOB NOT NULL
+                        )
+                    """);
 
             } catch (SQLException e) {
                 replay.getLogger().log(java.util.logging.Level.SEVERE, "Failed to init replay table", e);
@@ -60,21 +63,26 @@ public class MySQLReplayStorage implements ReplayStorage {
 
     @Override
     public CompletableFuture<Void> saveReplay(String name, List<TimelineEvent> timeline) {
+        return saveReplay(name, new ReplayData(timeline, null));
+    }
+
+    @Override
+    public CompletableFuture<Void> saveReplay(String name, ReplayData data) {
         return CompletableFuture.runAsync(() -> {
             try (Connection conn = dataSource.getConnection();
                  PreparedStatement ps = conn.prepareStatement("""
-                 INSERT INTO replays (name, data)
-                 VALUES (?, ?)
-                 ON DUPLICATE KEY UPDATE data = VALUES(data)
-             """)) {
+                         INSERT INTO replays (name, data)
+                         VALUES (?, ?)
+                         ON DUPLICATE KEY UPDATE data = VALUES(data)
+                     """)) {
 
-                String json = VersionUtil.wrapTimeline(gson, timeline, replay.getPluginMeta().getVersion());
-                byte[] data = isCompressionEnabled()
-                        ? ReplayCompressor.compress(json)
-                        : json.getBytes(StandardCharsets.UTF_8);
+                String json = VersionUtil.wrapReplayData(gson, data, replay.getPluginMeta().getVersion());
+                byte[] bytes = isCompressionEnabled()
+                    ? ReplayCompressor.compress(json)
+                    : json.getBytes(StandardCharsets.UTF_8);
 
                 ps.setString(1, name);
-                ps.setBytes(2, data);
+                ps.setBytes(2, bytes);
                 ps.executeUpdate();
 
             } catch (Exception e) {
@@ -86,10 +94,15 @@ public class MySQLReplayStorage implements ReplayStorage {
 
     @Override
     public CompletableFuture<List<TimelineEvent>> loadReplay(String name) {
+        return loadReplayData(name).thenApply(d -> d != null ? d.timeline() : null);
+    }
+
+    @Override
+    public CompletableFuture<ReplayData> loadReplayData(String name) {
         return CompletableFuture.supplyAsync(() -> {
             try (Connection conn = dataSource.getConnection();
                  PreparedStatement ps = conn.prepareStatement(
-                         "SELECT data FROM replays WHERE name=?"
+                     "SELECT data FROM replays WHERE name=?"
                  )) {
 
                 ps.setString(1, name);
@@ -98,7 +111,7 @@ public class MySQLReplayStorage implements ReplayStorage {
                     if (!rs.next()) return null;
                     // Auto-detect compression so legacy uncompressed rows still load
                     String json = ReplayCompressor.decompressIfNeeded(rs.getBytes("data"));
-                    return VersionUtil.parseReplayJson(gson, json, replay.getPluginMeta().getVersion(), TIMELINE_LIST_TYPE);
+                    return VersionUtil.parseReplayData(gson, json, replay.getPluginMeta().getVersion());
                 }
 
             } catch (Exception e) {
@@ -113,7 +126,7 @@ public class MySQLReplayStorage implements ReplayStorage {
         return CompletableFuture.supplyAsync(() -> {
             try (Connection conn = dataSource.getConnection();
                  PreparedStatement ps = conn.prepareStatement(
-                         "SELECT 1 FROM replays WHERE name=? LIMIT 1"
+                     "SELECT 1 FROM replays WHERE name=? LIMIT 1"
                  )) {
 
                 ps.setString(1, name);
@@ -135,7 +148,7 @@ public class MySQLReplayStorage implements ReplayStorage {
         return CompletableFuture.supplyAsync(() -> {
             try (Connection conn = dataSource.getConnection();
                  PreparedStatement ps = conn.prepareStatement(
-                         "DELETE FROM replays WHERE name=?"
+                     "DELETE FROM replays WHERE name=?"
                  )) {
 
                 ps.setString(1, name);
@@ -155,7 +168,7 @@ public class MySQLReplayStorage implements ReplayStorage {
             List<String> names = new ArrayList<>();
             try (Connection conn = dataSource.getConnection();
                  PreparedStatement ps = conn.prepareStatement(
-                         "SELECT name FROM replays ORDER BY created_at DESC"
+                     "SELECT name FROM replays ORDER BY created_at DESC"
                  );
                  ResultSet rs = ps.executeQuery()) {
 
@@ -174,7 +187,7 @@ public class MySQLReplayStorage implements ReplayStorage {
     public CompletableFuture<File> getReplayFile(String name) {
         return CompletableFuture.supplyAsync(() -> {
             try (Connection conn = dataSource.getConnection();
-                PreparedStatement ps = conn.prepareStatement("SELECT data FROM replays WHERE name=?")) {
+                 PreparedStatement ps = conn.prepareStatement("SELECT data FROM replays WHERE name=?")) {
 
                 ps.setString(1, name);
                 try (ResultSet rs = ps.executeQuery()) {
@@ -183,12 +196,12 @@ public class MySQLReplayStorage implements ReplayStorage {
 
                     // Auto-detect compression; works for both compressed and plain rows
                     String json = ReplayCompressor.decompressIfNeeded(rs.getBytes("data"));
-                    List<TimelineEvent> timeline = VersionUtil.parseReplayJson(gson, json, replay.getPluginMeta().getVersion(), TIMELINE_LIST_TYPE);
+                    ReplayData data = VersionUtil.parseReplayData(gson, json, replay.getPluginMeta().getVersion());
 
                     File tempFile = File.createTempFile("replay_" + name + "_", ".json");
                     tempFile.deleteOnExit();
                     try (FileWriter writer = new FileWriter(tempFile)) {
-                        gson.toJson(timeline, writer);
+                        writer.write(VersionUtil.wrapReplayData(gson, data, replay.getPluginMeta().getVersion()));
                     }
                     return tempFile;
                 }
