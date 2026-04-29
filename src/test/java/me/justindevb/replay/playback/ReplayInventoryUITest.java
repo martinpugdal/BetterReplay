@@ -1,5 +1,9 @@
 package me.justindevb.replay.playback;
 
+import java.util.Collections;
+import java.util.Map;
+import java.util.UUID;
+import java.util.function.Supplier;
 import me.justindevb.replay.entity.RecordedEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
@@ -9,11 +13,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-
-import java.util.Collections;
-import java.util.Map;
-import java.util.UUID;
-import java.util.function.Supplier;
 
 import static org.mockito.Mockito.*;
 
@@ -27,7 +26,7 @@ class ReplayInventoryUITest {
     @Mock private PlayerInventory playerInventory;
 
     private final Supplier<Map<UUID, RecordedEntity>> emptyEntities = Collections::emptyMap;
-    private final ReplayInventoryUI.SessionControl noOpControl = new ReplayInventoryUI.SessionControl() {
+    private final SessionControl noOpControl = new SessionControl() {
         @Override public void togglePause() {}
         @Override public void skipSeconds(int seconds) {}
         @Override public void stop() {}

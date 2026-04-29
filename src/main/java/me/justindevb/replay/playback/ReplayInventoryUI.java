@@ -1,11 +1,17 @@
 package me.justindevb.replay.playback;
 
+import java.util.Map;
+import java.util.UUID;
+import java.util.function.Supplier;
 import me.justindevb.replay.entity.RecordedEntity;
 import me.justindevb.replay.entity.RecordedPlayer;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.TextComponent;
 import net.kyori.adventure.text.format.NamedTextColor;
-import org.bukkit.*;
+import org.bukkit.Bukkit;
+import org.bukkit.Location;
+import org.bukkit.Material;
+import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -19,34 +25,18 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.inventory.meta.SkullMeta;
 
-import java.util.Map;
-import java.util.UUID;
-import java.util.function.Supplier;
-
 /**
  * Manages viewer inventory save/restore, replay control items, player menu,
  * and inventory-related event handlers during replay playback.
  */
 public class ReplayInventoryUI implements Listener {
 
-    /**
-     * Callback interface for actions that must be delegated back to ReplaySession.
-     */
-    public interface SessionControl {
-        void togglePause();
-        void skipSeconds(int seconds);
-        void stop();
-        boolean isActive();
-    }
-
     private final Player viewer;
     private final Supplier<Map<UUID, RecordedEntity>> recordedEntitiesSupplier;
     private final SessionControl sessionControl;
-
     private ItemStack[] viewerInventory;
     private ItemStack[] viewerArmor;
     private ItemStack viewerOffHand;
-
     public ReplayInventoryUI(Player viewer,
                              Supplier<Map<UUID, RecordedEntity>> recordedEntitiesSupplier,
                              SessionControl sessionControl) {
@@ -117,9 +107,9 @@ public class ReplayInventoryUI implements Listener {
 
     public void openPlayerMenu() {
         Inventory inv = Bukkit.createInventory(
-                null,
-                27,
-                Component.text("Recorded Players", NamedTextColor.DARK_GRAY)
+            null,
+            27,
+            Component.text("Recorded Players", NamedTextColor.DARK_GRAY)
         );
 
         for (RecordedEntity entity : recordedEntitiesSupplier.get().values()) {
@@ -182,7 +172,11 @@ public class ReplayInventoryUI implements Listener {
                 double invD = 1.0 / dir.getX();
                 double t1 = minX * invD;
                 double t2 = maxX * invD;
-                if (t1 > t2) { double tmp = t1; t1 = t2; t2 = tmp; }
+                if (t1 > t2) {
+                    double tmp = t1;
+                    t1 = t2;
+                    t2 = tmp;
+                }
                 tMin = Math.max(tMin, t1);
                 tMax = Math.min(tMax, t2);
                 if (tMin > tMax) continue;
@@ -195,7 +189,11 @@ public class ReplayInventoryUI implements Listener {
                 double invD = 1.0 / dir.getY();
                 double t1 = minY * invD;
                 double t2 = maxY * invD;
-                if (t1 > t2) { double tmp = t1; t1 = t2; t2 = tmp; }
+                if (t1 > t2) {
+                    double tmp = t1;
+                    t1 = t2;
+                    t2 = tmp;
+                }
                 tMin = Math.max(tMin, t1);
                 tMax = Math.min(tMax, t2);
                 if (tMin > tMax) continue;
@@ -208,7 +206,11 @@ public class ReplayInventoryUI implements Listener {
                 double invD = 1.0 / dir.getZ();
                 double t1 = minZ * invD;
                 double t2 = maxZ * invD;
-                if (t1 > t2) { double tmp = t1; t1 = t2; t2 = tmp; }
+                if (t1 > t2) {
+                    double tmp = t1;
+                    t1 = t2;
+                    t2 = tmp;
+                }
                 tMin = Math.max(tMin, t1);
                 tMax = Math.min(tMax, t2);
                 if (tMin > tMax) continue;
@@ -223,8 +225,6 @@ public class ReplayInventoryUI implements Listener {
         }
         return closest;
     }
-
-    // -- Event Handlers --
 
     @EventHandler
     public void onPlayerInteract(PlayerInteractEvent e) {
@@ -259,6 +259,8 @@ public class ReplayInventoryUI implements Listener {
 
         e.setCancelled(true);
     }
+
+    // -- Event Handlers --
 
     @EventHandler(priority = EventPriority.HIGH)
     public void onInventoryClick(InventoryClickEvent e) {
@@ -320,4 +322,5 @@ public class ReplayInventoryUI implements Listener {
 
         e.setCancelled(true);
     }
+
 }

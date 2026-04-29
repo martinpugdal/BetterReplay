@@ -1,15 +1,27 @@
 package me.justindevb.replay.playback;
 
 import com.github.retrooper.packetevents.PacketEvents;
-import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerBlockBreakAnimation;
 import com.github.retrooper.packetevents.util.Vector3i;
-import org.bukkit.*;
-import org.bukkit.entity.Player;
-
+import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerBlockBreakAnimation;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import me.justindevb.replay.Replay;
 import me.justindevb.replay.recording.TimelineEvent;
-
-import java.util.*;
+import me.justindevb.replay.snapshot.ChunkSnapshot;
+import me.justindevb.replay.snapshot.WorldSnapshot;
+import org.bukkit.Bukkit;
+import org.bukkit.Location;
+import org.bukkit.Material;
+import org.bukkit.Particle;
+import org.bukkit.World;
+import org.bukkit.entity.Player;
 
 /**
  * Manages block state desync/resync during replay playback.
@@ -20,16 +32,28 @@ public class ReplayBlockManager {
 
     private final Player viewer;
     private final Replay replay;
-
-    public record BlockKey(String world, int x, int y, int z) {}
-
     private final Map<BlockKey, String> sessionBaseline = new HashMap<>();
     private final Set<BlockKey> visibleBreakStages = new HashSet<>();
     private int blockBreakMutationEpoch = 0;
-
     public ReplayBlockManager(Player viewer, Replay replay) {
         this.viewer = viewer;
         this.replay = replay;
+    }
+
+    public static Double asDouble(Object obj) {
+        return obj instanceof Number n ? n.doubleValue() : null;
+    }
+
+    public static Integer asInt(Object obj) {
+        return obj instanceof Number n ? n.intValue() : null;
+    }
+
+    public static Float asFloat(Object obj) {
+        return obj instanceof Number n ? n.floatValue() : 0f;
+    }
+
+    public static String asString(Object obj) {
+        return obj instanceof String s ? s : null;
     }
 
     public int getEpoch() {
@@ -38,6 +62,52 @@ public class ReplayBlockManager {
 
     public void incrementEpoch() {
         blockBreakMutationEpoch++;
+    }
+
+    /**
+     * Replays the recorded world state for chunks captured at recording time so that
+     * the viewer sees the original surroundings even if the live world has since
+     * changed (e.g. a regenerating mine). Only blocks that differ from the live world
+     * are sent to the viewer, keeping packet volume to a minimum in the common case
+     * where nothing has changed.
+     */
+    public void primeFromSnapshot(WorldSnapshot snapshot) {
+        if (snapshot == null || snapshot.isEmpty()) return;
+
+        for (ChunkSnapshot chunk : snapshot.getChunks()) {
+            World world = Bukkit.getWorld(chunk.world());
+            if (world == null) continue;
+
+            int baseX = chunk.chunkX() << 4;
+            int baseZ = chunk.chunkZ() << 4;
+            int minY = chunk.minY();
+            int height = chunk.height();
+            List<String> palette = chunk.palette();
+            int[] indices = chunk.indices();
+
+            for (int dy = 0; dy < height; dy++) {
+                int worldY = minY + dy;
+                for (int dz = 0; dz < 16; dz++) {
+                    for (int dx = 0; dx < 16; dx++) {
+                        int flat = (dy * 256) + (dz * 16) + dx;
+                        int paletteIdx = indices[flat];
+                        if (paletteIdx < 0 || paletteIdx >= palette.size()) continue;
+                        String snapshotData = palette.get(paletteIdx);
+                        if (snapshotData == null) continue;
+
+                        int worldX = baseX + dx;
+                        int worldZ = baseZ + dz;
+
+                        String liveData = world.getBlockAt(worldX, worldY, worldZ).getBlockData().getAsString();
+                        if (snapshotData.equals(liveData)) continue;
+
+                        BlockKey key = new BlockKey(chunk.world(), worldX, worldY, worldZ);
+                        sessionBaseline.put(key, snapshotData);
+                        sendBlockStateToViewer(world, worldX, worldY, worldZ, snapshotData);
+                    }
+                }
+            }
+        }
     }
 
     public void primeInitialBrokenBlockStates(List<TimelineEvent> timeline) {
@@ -64,9 +134,21 @@ public class ReplayBlockManager {
             String worldName;
             int x, y, z;
             switch (event) {
-                case TimelineEvent.BlockBreak e -> { worldName = e.world(); x = e.x(); y = e.y(); z = e.z(); }
-                case TimelineEvent.BlockPlace e -> { worldName = e.world(); x = e.x(); y = e.y(); z = e.z(); }
-                default -> { continue; }
+                case TimelineEvent.BlockBreak e -> {
+                    worldName = e.world();
+                    x = e.x();
+                    y = e.y();
+                    z = e.z();
+                }
+                case TimelineEvent.BlockPlace e -> {
+                    worldName = e.world();
+                    x = e.x();
+                    y = e.y();
+                    z = e.z();
+                }
+                default -> {
+                    continue;
+                }
             }
 
             if (worldName == null) continue;
@@ -165,7 +247,7 @@ public class ReplayBlockManager {
                 }
 
                 synthesizedStages.add(new TimelineEvent.BlockBreakStage(
-                        stageTick, uuid, key.world(), key.x(), key.y(), key.z(), stage
+                    stageTick, uuid, key.world(), key.x(), key.y(), key.z(), stage
                 ));
             }
         }
@@ -184,9 +266,21 @@ public class ReplayBlockManager {
         String worldName;
         int x, y, z;
         switch (event) {
-            case TimelineEvent.BlockBreak e -> { worldName = e.world(); x = e.x(); y = e.y(); z = e.z(); }
-            case TimelineEvent.BlockPlace e -> { worldName = e.world(); x = e.x(); y = e.y(); z = e.z(); }
-            default -> { return; }
+            case TimelineEvent.BlockBreak e -> {
+                worldName = e.world();
+                x = e.x();
+                y = e.y();
+                z = e.z();
+            }
+            case TimelineEvent.BlockPlace e -> {
+                worldName = e.world();
+                x = e.x();
+                y = e.y();
+                z = e.z();
+            }
+            default -> {
+                return;
+            }
         }
 
         if (worldName == null) return;
@@ -223,13 +317,13 @@ public class ReplayBlockManager {
 
         int mutationEpoch = blockBreakMutationEpoch;
         replay.getFoliaLib().getScheduler().runLater(
-                () -> {
-                    if (mutationEpoch != blockBreakMutationEpoch) {
-                        return;
-                    }
-                    viewer.sendBlockChange(blockLoc, Material.AIR.createBlockData());
-                },
-                3L
+            () -> {
+                if (mutationEpoch != blockBreakMutationEpoch) {
+                    return;
+                }
+                viewer.sendBlockChange(blockLoc, Material.AIR.createBlockData());
+            },
+            3L
         );
     }
 
@@ -265,7 +359,7 @@ public class ReplayBlockManager {
 
         int animationId = Objects.hash(worldName, x, y, z);
         WrapperPlayServerBlockBreakAnimation breakAnim =
-                new WrapperPlayServerBlockBreakAnimation(animationId, new Vector3i(x, y, z), (byte) stage);
+            new WrapperPlayServerBlockBreakAnimation(animationId, new Vector3i(x, y, z), (byte) stage);
 
         PacketEvents.getAPI().getPlayerManager().sendPacket(viewer, breakAnim);
         if (key != null) {
@@ -284,11 +378,13 @@ public class ReplayBlockManager {
         }
     }
 
+    // -- helpers --
+
     public void computeAndApplyBlockStateAtIndex(int targetIndexExclusive, List<TimelineEvent> timeline) {
         String airBlockData = Material.AIR.createBlockData().getAsString();
         Map<BlockKey, String> stateAtTarget = new HashMap<>(sessionBaseline);
 
-        int end = Math.max(0, Math.min(targetIndexExclusive, timeline.size()));
+        int end = Math.clamp(targetIndexExclusive, 0, timeline.size());
         for (int i = 0; i < end; i++) {
             TimelineEvent event = timeline.get(i);
             if (event instanceof TimelineEvent.BlockPlace bp) {
@@ -313,8 +409,8 @@ public class ReplayBlockManager {
     }
 
     public void applyReplayBlockChangesInRange(int fromIndex, int toIndexExclusive, List<TimelineEvent> timeline) {
-        int start = Math.max(0, Math.min(fromIndex, timeline.size()));
-        int end = Math.max(start, Math.min(toIndexExclusive, timeline.size()));
+        int start = Math.clamp(fromIndex, 0, timeline.size());
+        int end = Math.max(start, Math.clamp(toIndexExclusive, 0, timeline.size()));
 
         for (int i = start; i < end; i++) {
             TimelineEvent event = timeline.get(i);
@@ -331,12 +427,20 @@ public class ReplayBlockManager {
         computeAndApplyBlockStateAtIndex(targetIndexExclusive, timeline);
     }
 
-    // -- helpers --
+    public BlockKey blockKeyFromEvent(TimelineEvent event) {
+        return switch (event) {
+            case TimelineEvent.BlockBreak e -> new BlockKey(e.world(), e.x(), e.y(), e.z());
+            case TimelineEvent.BlockPlace e -> new BlockKey(e.world(), e.x(), e.y(), e.z());
+            case TimelineEvent.BlockBreakStage e -> new BlockKey(e.world(), e.x(), e.y(), e.z());
+            case TimelineEvent.BlockBreakComplete e -> new BlockKey(e.world(), e.x(), e.y(), e.z());
+            default -> null;
+        };
+    }
 
     private void clearVisibleBreakStage(BlockKey key) {
         int animationId = Objects.hash(key.world(), key.x(), key.y(), key.z());
         WrapperPlayServerBlockBreakAnimation clearAnim =
-                new WrapperPlayServerBlockBreakAnimation(animationId, new Vector3i(key.x(), key.y(), key.z()), (byte) -1);
+            new WrapperPlayServerBlockBreakAnimation(animationId, new Vector3i(key.x(), key.y(), key.z()), (byte) -1);
         PacketEvents.getAPI().getPlayerManager().sendPacket(viewer, clearAnim);
         visibleBreakStages.remove(key);
     }
@@ -348,18 +452,20 @@ public class ReplayBlockManager {
         }
     }
 
+    // -- type casting helpers (retained for ReplaySession compatibility) --
+
     private void sendBlockBreakParticles(World world, int x, int y, int z, String blockData) {
         try {
             Location center = new Location(world, x + 0.5, y + 0.5, z + 0.5);
             viewer.spawnParticle(
-                    Particle.BLOCK,
-                    center,
-                    24,
-                    0.25,
-                    0.25,
-                    0.25,
-                    0.02,
-                    Bukkit.createBlockData(blockData)
+                Particle.BLOCK,
+                center,
+                24,
+                0.25,
+                0.25,
+                0.25,
+                0.02,
+                Bukkit.createBlockData(blockData)
             );
         } catch (IllegalArgumentException ignored) {
         }
@@ -377,31 +483,6 @@ public class ReplayBlockManager {
         return false;
     }
 
-    public BlockKey blockKeyFromEvent(TimelineEvent event) {
-        return switch (event) {
-            case TimelineEvent.BlockBreak e -> new BlockKey(e.world(), e.x(), e.y(), e.z());
-            case TimelineEvent.BlockPlace e -> new BlockKey(e.world(), e.x(), e.y(), e.z());
-            case TimelineEvent.BlockBreakStage e -> new BlockKey(e.world(), e.x(), e.y(), e.z());
-            case TimelineEvent.BlockBreakComplete e -> new BlockKey(e.world(), e.x(), e.y(), e.z());
-            default -> null;
-        };
-    }
-
-    // -- type casting helpers (retained for ReplaySession compatibility) --
-
-    public static Double asDouble(Object obj) {
-        return obj instanceof Number n ? n.doubleValue() : null;
-    }
-
-    public static Integer asInt(Object obj) {
-        return obj instanceof Number n ? n.intValue() : null;
-    }
-
-    public static Float asFloat(Object obj) {
-        return obj instanceof Number n ? n.floatValue() : 0f;
-    }
-
-    public static String asString(Object obj) {
-        return obj instanceof String s ? String.valueOf(s) : null;
+    public record BlockKey(String world, int x, int y, int z) {
     }
 }
