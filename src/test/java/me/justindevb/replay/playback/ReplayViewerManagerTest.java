@@ -3,6 +3,7 @@ package me.justindevb.replay.playback;
 import me.justindevb.replay.Replay;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
+import org.bukkit.event.player.PlayerChangedWorldEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.plugin.PluginManager;
 import org.junit.jupiter.api.Test;
@@ -27,6 +28,10 @@ class ReplayViewerManagerTest {
 
     private ReplayViewerManager createManager() {
         return new ReplayViewerManager(viewer, replay, sessionControl);
+    }
+
+    private ReplayViewerManager createManagerWithWorldChange(Runnable onWorldChanged) {
+        return new ReplayViewerManager(viewer, replay, sessionControl, onWorldChanged);
     }
 
     @Test
@@ -110,6 +115,70 @@ class ReplayViewerManagerTest {
             mgr.onPlayerQuit(event);
 
             verify(sessionControl, never()).stop();
+        }
+    }
+
+    @Test
+    void onPlayerChangedWorld_viewer_runsCallback() {
+        try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
+            bukkit.when(Bukkit::getPluginManager).thenReturn(pluginManager);
+            when(sessionControl.isActive()).thenReturn(true);
+
+            Runnable callback = mock(Runnable.class);
+            ReplayViewerManager mgr = createManagerWithWorldChange(callback);
+            PlayerChangedWorldEvent event = mock(PlayerChangedWorldEvent.class);
+            when(event.getPlayer()).thenReturn(viewer);
+
+            mgr.onPlayerChangedWorld(event);
+
+            verify(callback).run();
+        }
+    }
+
+    @Test
+    void onPlayerChangedWorld_otherPlayer_doesNotRunCallback() {
+        try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
+            bukkit.when(Bukkit::getPluginManager).thenReturn(pluginManager);
+
+            Runnable callback = mock(Runnable.class);
+            ReplayViewerManager mgr = createManagerWithWorldChange(callback);
+            PlayerChangedWorldEvent event = mock(PlayerChangedWorldEvent.class);
+            when(event.getPlayer()).thenReturn(mock(Player.class));
+
+            mgr.onPlayerChangedWorld(event);
+
+            verify(callback, never()).run();
+        }
+    }
+
+    @Test
+    void onPlayerChangedWorld_inactiveSession_doesNotRunCallback() {
+        try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
+            bukkit.when(Bukkit::getPluginManager).thenReturn(pluginManager);
+            when(sessionControl.isActive()).thenReturn(false);
+
+            Runnable callback = mock(Runnable.class);
+            ReplayViewerManager mgr = createManagerWithWorldChange(callback);
+            PlayerChangedWorldEvent event = mock(PlayerChangedWorldEvent.class);
+            when(event.getPlayer()).thenReturn(viewer);
+
+            mgr.onPlayerChangedWorld(event);
+
+            verify(callback, never()).run();
+        }
+    }
+
+    @Test
+    void onPlayerChangedWorld_legacyConstructor_doesNotNpe() {
+        try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
+            bukkit.when(Bukkit::getPluginManager).thenReturn(pluginManager);
+            when(sessionControl.isActive()).thenReturn(true);
+
+            ReplayViewerManager mgr = createManager();
+            PlayerChangedWorldEvent event = mock(PlayerChangedWorldEvent.class);
+            when(event.getPlayer()).thenReturn(viewer);
+
+            mgr.onPlayerChangedWorld(event); // must not throw NPE when callback is null
         }
     }
 }

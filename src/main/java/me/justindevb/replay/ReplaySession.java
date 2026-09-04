@@ -100,7 +100,7 @@ public class ReplaySession {
         this.fakeEntityManager = new FakeEntityManager(viewer);
         this.playbackEngine = new PlaybackEngine(deadEntities, recordedEntities, blockManager, fakeEntityManager);
         this.inventoryUI = new ReplayInventoryUI(viewer, () -> recordedEntities, sessionControl);
-        this.viewerManager = new ReplayViewerManager(viewer, replay, sessionControl);
+        this.viewerManager = new ReplayViewerManager(viewer, replay, sessionControl, this::respawnRecordedEntitiesForViewer);
         this.interactionHandler = new ReplayInteractionHandler(viewer, replay, () -> recordedEntities, fakeEntityManager);
 
         Bukkit.getPluginManager().registerEvents(inventoryUI, replay);
@@ -404,6 +404,18 @@ public class ReplaySession {
             return UUID.fromString(uuidStr);
         } catch (IllegalArgumentException ignored) {
             return null;
+        }
+    }
+
+    /**
+     * Re-send spawn packets for every live recorded entity to the viewer.
+     * Invoked when the viewer changes world: the client destroys all entities on
+     * dimension change, so without this the recorded players/mobs become invisible
+     * even though their fakeEntityIds and state on our side are still tracked.
+     */
+    private void respawnRecordedEntitiesForViewer() {
+        for (RecordedEntity entity : recordedEntities.values()) {
+            entity.respawn();
         }
     }
 

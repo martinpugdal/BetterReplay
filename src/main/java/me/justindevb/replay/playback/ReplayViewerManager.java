@@ -6,6 +6,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.HandlerList;
 import org.bukkit.event.Listener;
+import org.bukkit.event.player.PlayerChangedWorldEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 
 /**
@@ -20,13 +21,19 @@ public class ReplayViewerManager implements Listener {
 
     private final Player viewer;
     private final SessionControl sessionControl;
+    private final Runnable onViewerChangedWorld;
 
     private boolean originalInvulnerable;
     private boolean originalCanPickupItems;
 
     public ReplayViewerManager(Player viewer, Replay replay, SessionControl sessionControl) {
+        this(viewer, replay, sessionControl, null);
+    }
+
+    public ReplayViewerManager(Player viewer, Replay replay, SessionControl sessionControl, Runnable onViewerChangedWorld) {
         this.viewer = viewer;
         this.sessionControl = sessionControl;
+        this.onViewerChangedWorld = onViewerChangedWorld;
         Bukkit.getPluginManager().registerEvents(this, replay);
     }
 
@@ -59,5 +66,13 @@ public class ReplayViewerManager implements Listener {
         if (event.getPlayer().equals(viewer)) {
             sessionControl.stop();
         }
+    }
+
+    @EventHandler
+    public void onPlayerChangedWorld(PlayerChangedWorldEvent event) {
+        if (!event.getPlayer().equals(viewer)) return;
+        if (!sessionControl.isActive()) return;
+        if (onViewerChangedWorld == null) return;
+        onViewerChangedWorld.run();
     }
 }

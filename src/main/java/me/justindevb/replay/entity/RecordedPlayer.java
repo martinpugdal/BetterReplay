@@ -13,6 +13,7 @@ import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEn
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityHeadLook;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityMetadata;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityTeleport;
+import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerPlayerInfoRemove;
 import io.github.retrooper.packetevents.util.SpigotConversionUtil;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -63,6 +64,12 @@ public class RecordedPlayer extends RecordedEntity {
 
     @Override
     public void spawn(Location location) {
+        if (fakeProfileUuid != null) {
+            WrapperPlayServerPlayerInfoRemove remove =
+                new WrapperPlayServerPlayerInfoRemove(Collections.singletonList(fakeProfileUuid));
+            PacketEvents.getAPI().getPlayerManager().sendPacket(viewer, remove);
+        }
+        spawned = false;
         SpawnFakePlayer fakePlayer = new SpawnFakePlayer(uuid, name, location, viewer, super.fakeEntityId, () -> {
             this.spawned = true;
             sendMetadata();

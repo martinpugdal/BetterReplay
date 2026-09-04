@@ -35,6 +35,19 @@ public abstract class RecordedEntity {
 
     public abstract void moveTo(Location location);
 
+    /**
+     * Re-spawn this entity for the viewer at its current location. Called after the
+     * viewer changes world: the client destroys all entities on dimension change, so
+     * we need to re-send the spawn packets to make the entity visible again. Same
+     * fakeEntityId is reused so the in-flight movement/animation packets still apply.
+     */
+    public void respawn() {
+        if (isDestroyed()) return;
+        Location loc = getCurrentLocation();
+        if (loc == null) return;
+        spawn(loc);
+    }
+
     public void destroy() {
         if (destroyed) return;
         destroyed = true;
